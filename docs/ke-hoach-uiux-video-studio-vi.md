@@ -8,6 +8,8 @@
 
 **Tech Stack:** Streamlit 1.45, Python 3.11, FastAPI backend hien tai, `VideoParams`/`tm.start()` pipeline hien tai, unittest/pytest-compatible tests, Streamlit AppTest cho smoke test UI.
 
+**Update 2026-05-27:** Phan Create Video khong tiep tuc theo layout 6 tabs. Plan thay the cho Create single-page UX va render/log persistence nam tai `docs/ke-hoach-create-video-single-page-render-persistence-vi.md`.
+
 ---
 
 ## 1. Tai sao can doi UI/UX
