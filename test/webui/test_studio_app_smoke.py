@@ -1,4 +1,5 @@
 import sys
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -8,6 +9,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 class TestStudioAppSmoke(unittest.TestCase):
+    def test_main_entrypoint_boots_when_cwd_is_not_project_root(self):
+        app_path = Path(__file__).parent.parent.parent / "webui" / "Main.py"
+
+        result = subprocess.run(
+            [sys.executable, str(app_path)],
+            cwd="/tmp",
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        output = f"{result.stdout}\n{result.stderr}"
+        self.assertEqual(result.returncode, 0, output)
+        self.assertNotIn("ModuleNotFoundError: No module named 'webui'", output)
+
     def test_main_entrypoint_renders_studio_create_page(self):
         app_path = Path(__file__).parent.parent.parent / "webui" / "Main.py"
 
