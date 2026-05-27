@@ -5,7 +5,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.models.schema import VideoAspect, VideoConcatMode, VideoTransitionMode
-from webui.studio.state import StudioCreateState, build_video_params
+from webui.studio.state import (
+    StudioCreateState,
+    build_video_params,
+    deserialize_create_state,
+    serialize_create_state,
+)
 
 
 class TestStudioState(unittest.TestCase):
@@ -76,6 +81,45 @@ class TestStudioState(unittest.TestCase):
         self.assertEqual(params.video_materials[0].provider, "local")
         self.assertEqual(params.video_materials[0].url, "/tmp/a.mp4")
         self.assertEqual(params.video_materials[0].duration, 5)
+
+    def test_create_state_round_trip_preserves_full_settings(self):
+        state = StudioCreateState(
+            video_subject="Morning focus",
+            video_script="Plan your day before opening email.",
+            video_terms="productive work, focused work",
+            video_language="en-US",
+            local_video_materials=[
+                {"provider": "local", "url": "/tmp/focus.mp4", "duration": 8}
+            ],
+            uploaded_audio_path="/tmp/uploaded.mp3",
+            custom_audio_file="/tmp/custom.mp3",
+            video_source="local",
+            video_aspect="16:9",
+            video_concat_mode="sequential",
+            video_transition_mode="FadeIn",
+            video_clip_duration=8,
+            video_count=3,
+            n_threads=4,
+            voice_name="en-US-JennyNeural-Female",
+            voice_volume=1.5,
+            voice_rate=1.2,
+            bgm_type="custom",
+            bgm_file="/tmp/bgm.mp3",
+            bgm_volume=0.4,
+            subtitle_enabled=False,
+            subtitle_position="custom",
+            custom_position=64.0,
+            font_name="Inter-Bold.ttf",
+            text_fore_color="#F8FAFC",
+            text_background_color=False,
+            font_size=74,
+            stroke_color="#020617",
+            stroke_width=3.5,
+        )
+
+        restored = deserialize_create_state(serialize_create_state(state))
+
+        self.assertEqual(restored, state)
 
 
 if __name__ == "__main__":

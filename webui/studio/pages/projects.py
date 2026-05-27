@@ -24,6 +24,8 @@ def render_page() -> None:
             "Subject": item.get("subject", ""),
             "Source": item.get("source", ""),
             "Videos": len(item["videos"]),
+            "Progress": item.get("progress", 0),
+            "State": item.get("state", ""),
             "Path": item["path"],
         }
         for item in outputs
@@ -41,7 +43,10 @@ def render_page() -> None:
         with st.expander("Script and keywords", expanded=False):
             st.text_area("Script", value=selected.get("script", ""), height=160)
             st.write(selected.get("search_terms", []))
-    col_a, col_b = st.columns(2)
+    if selected.get("log_excerpt"):
+        with st.expander("Render log", expanded=not selected["videos"]):
+            st.code(selected["log_excerpt"])
+    col_a, col_b, col_c = st.columns(3)
     with col_a:
         if st.button("Reuse in Create", use_container_width=True):
             params = selected.get("params", {})
@@ -54,5 +59,10 @@ def render_page() -> None:
             st.session_state["video_language"] = params.get("video_language", "")
             st.success("Loaded task script into Create.")
     with col_b:
+        if st.button("Continue in Create", use_container_width=True):
+            st.session_state["studio_active_render_task_id"] = selected["task_id"]
+            st.session_state["studio_last_render_task_id"] = selected["task_id"]
+            st.success("Active task set. Open Create to continue monitoring.")
+    with col_c:
         st.link_button("Open Project Folder", f"file://{selected['path']}", use_container_width=True)
     render_video_outputs(selected["videos"])

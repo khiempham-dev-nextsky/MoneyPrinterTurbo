@@ -63,6 +63,15 @@ def render_subtitle_settings(state: StudioCreateState) -> None:
     state.subtitle_position = subtitle_positions[selected_position][1]
     config.ui["subtitle_position"] = state.subtitle_position
 
+    state.text_fore_color = st.color_picker(
+        tr("Font Color"),
+        value=state.text_fore_color,
+    )
+    config.ui["text_fore_color"] = state.text_fore_color
+    _render_subtitle_preview(state)
+
+
+def render_subtitle_advanced_settings(state: StudioCreateState) -> None:
     if state.subtitle_position == "custom":
         state.custom_position = st.number_input(
             tr("Custom Position (% from top)"),
@@ -73,16 +82,8 @@ def render_subtitle_settings(state: StudioCreateState) -> None:
         )
         config.ui["custom_position"] = state.custom_position
 
-    color_col, size_col = st.columns([1, 2])
-    with color_col:
-        state.text_fore_color = st.color_picker(
-            tr("Font Color"),
-            value=state.text_fore_color,
-        )
-        config.ui["text_fore_color"] = state.text_fore_color
-    with size_col:
-        state.font_size = st.slider(tr("Font Size"), 30, 100, int(state.font_size))
-        config.ui["font_size"] = state.font_size
+    state.font_size = st.slider(tr("Font Size"), 30, 100, int(state.font_size))
+    config.ui["font_size"] = state.font_size
 
     stroke_color_col, stroke_width_col = st.columns([1, 2])
     with stroke_color_col:
@@ -95,6 +96,8 @@ def render_subtitle_settings(state: StudioCreateState) -> None:
             value=float(state.stroke_width),
         )
 
+
+def _render_subtitle_preview(state: StudioCreateState) -> None:
     st.markdown(
         f"""
         <div style="background:#111827;border-radius:8px;padding:24px;text-align:center;">
@@ -108,4 +111,3 @@ def render_subtitle_settings(state: StudioCreateState) -> None:
         """,
         unsafe_allow_html=True,
     )
-

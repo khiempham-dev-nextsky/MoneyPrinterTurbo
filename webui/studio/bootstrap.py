@@ -26,6 +26,9 @@ support_locales = [
     "tr-TR",
 ]
 
+_stdout_sink_id = None
+_log_initialized = False
+
 
 def ensure_root_on_path() -> None:
     if root_dir not in sys.path:
@@ -50,7 +53,16 @@ def init_page_config() -> None:
 
 
 def init_log() -> None:
-    logger.remove()
+    global _log_initialized, _stdout_sink_id
+
+    if _stdout_sink_id is not None:
+        try:
+            logger.remove(_stdout_sink_id)
+        except ValueError:
+            pass
+    elif not _log_initialized:
+        logger.remove()
+    _log_initialized = True
 
     def format_record(record):
         file_path = record["file"].path
@@ -64,7 +76,12 @@ def init_log() -> None:
             + "- <level>{message}</>\n"
         )
 
-    logger.add(sys.stdout, level="DEBUG", format=format_record, colorize=True)
+    _stdout_sink_id = logger.add(
+        sys.stdout,
+        level="DEBUG",
+        format=format_record,
+        colorize=True,
+    )
 
 
 def init_session_state() -> None:
@@ -86,4 +103,3 @@ def boot() -> None:
     init_page_config()
     init_log()
     init_session_state()
-

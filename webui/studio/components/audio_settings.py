@@ -86,6 +86,12 @@ def render_audio_settings(state: StudioCreateState):
                 st.audio(audio_file, format="audio/mp3")
                 os.remove(audio_file)
 
+    return None
+
+
+def render_audio_advanced_settings(state: StudioCreateState):
+    selected_server = config.ui.get("tts_server", "azure-tts-v1")
+
     if selected_server == "azure-tts-v2" or (
         state.voice_name and voice.is_azure_v2_voice(state.voice_name)
     ):
@@ -116,17 +122,23 @@ def render_audio_settings(state: StudioCreateState):
         )
 
     col_a, col_b = st.columns(2)
+    volume_options = [0.6, 0.8, 1.0, 1.2, 1.5, 2.0, 3.0, 4.0, 5.0]
+    rate_options = [0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.8, 2.0]
     with col_a:
         state.voice_volume = st.selectbox(
             tr("Speech Volume"),
-            options=[0.6, 0.8, 1.0, 1.2, 1.5, 2.0, 3.0, 4.0, 5.0],
-            index=2,
+            options=volume_options,
+            index=volume_options.index(state.voice_volume)
+            if state.voice_volume in volume_options
+            else 2,
         )
     with col_b:
         state.voice_rate = st.selectbox(
             tr("Speech Rate"),
-            options=[0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.8, 2.0],
-            index=2,
+            options=rate_options,
+            index=rate_options.index(state.voice_rate)
+            if state.voice_rate in rate_options
+            else 2,
         )
 
     uploaded_audio_file = st.file_uploader(
@@ -144,11 +156,12 @@ def render_audio_settings(state: StudioCreateState):
         (tr("Random Background Music"), "random"),
         (tr("Custom Background Music"), "custom"),
     ]
+    bgm_values = [value for _, value in bgm_options]
     selected_bgm = st.selectbox(
         tr("Background Music"),
         options=range(len(bgm_options)),
         format_func=lambda x: bgm_options[x][0],
-        index=1,
+        index=bgm_values.index(state.bgm_type) if state.bgm_type in bgm_values else 1,
     )
     state.bgm_type = bgm_options[selected_bgm][1]
     if state.bgm_type == "custom":
@@ -156,7 +169,10 @@ def render_audio_settings(state: StudioCreateState):
     state.bgm_volume = st.selectbox(
         tr("Background Music Volume"),
         options=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-        index=2,
+        index=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].index(
+            state.bgm_volume
+        )
+        if state.bgm_volume in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+        else 2,
     )
     return uploaded_audio_file
-

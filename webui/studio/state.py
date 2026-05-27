@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any
 
 import streamlit as st
@@ -50,6 +50,30 @@ class StudioCreateState:
     stroke_width: float = 1.5
 
 
+@dataclass
+class StudioRenderSnapshot:
+    task_id: str
+    state: int | None = None
+    progress: int = 0
+    status_label: str = "Idle"
+    log_lines: list[str] = field(default_factory=list)
+    videos: list[str] = field(default_factory=list)
+    task_dir: str = ""
+    error: str = ""
+
+
+def serialize_create_state(state: StudioCreateState) -> dict[str, Any]:
+    return asdict(state)
+
+
+def deserialize_create_state(payload: dict[str, Any] | None) -> StudioCreateState:
+    if not isinstance(payload, dict):
+        return StudioCreateState()
+    valid_names = {item.name for item in fields(StudioCreateState)}
+    values = {key: value for key, value in payload.items() if key in valid_names}
+    return StudioCreateState(**values)
+
+
 def material_records_to_infos(records: list[dict[str, Any]]) -> list[MaterialInfo]:
     materials = []
     for record in records:
@@ -99,7 +123,7 @@ def build_video_params(state: StudioCreateState) -> VideoParams:
     return params
 
 
-def load_create_state() -> StudioCreateState:
+def _default_create_state() -> StudioCreateState:
     return StudioCreateState(
         video_subject=st.session_state.get("video_subject", ""),
         video_script=st.session_state.get("video_script", ""),
@@ -116,7 +140,18 @@ def load_create_state() -> StudioCreateState:
     )
 
 
+def load_create_state() -> StudioCreateState:
+    default_state = _default_create_state()
+    saved_state = st.session_state.get("studio_create_state")
+    if isinstance(saved_state, dict):
+        merged = serialize_create_state(default_state)
+        merged.update(saved_state)
+        return deserialize_create_state(merged)
+    return default_state
+
+
 def save_create_state(state: StudioCreateState) -> None:
+    st.session_state["studio_create_state"] = serialize_create_state(state)
     st.session_state["video_subject"] = state.video_subject
     st.session_state["video_script"] = state.video_script
     st.session_state["video_terms"] = state.video_terms

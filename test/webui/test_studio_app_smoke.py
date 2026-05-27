@@ -31,6 +31,8 @@ class TestStudioAppSmoke(unittest.TestCase):
 
         self.assertEqual(app.exception, [])
         markdown_values = [item.value for item in app.markdown]
+        subheader_values = [item.value for item in app.subheader]
+        visible_values = markdown_values + subheader_values
         self.assertTrue(
             any("MoneyPrinterTurbo Studio" in value for value in markdown_values),
             markdown_values,
@@ -39,6 +41,23 @@ class TestStudioAppSmoke(unittest.TestCase):
             any("Create Video" in value for value in markdown_values),
             markdown_values,
         )
+        self.assertTrue(
+            any("Brief & Script" in value for value in visible_values),
+            visible_values,
+        )
+        self.assertTrue(
+            any("Render & Monitor" in value for value in visible_values),
+            visible_values,
+        )
+
+    def test_create_page_source_no_longer_uses_tabbed_workflow(self):
+        create_source = (
+            Path(__file__).parent.parent.parent / "webui" / "studio" / "pages" / "create.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("st.tabs", create_source)
+        self.assertNotIn('"1. Brief"', create_source)
+        self.assertNotIn('"6. Review & Render"', create_source)
 
 
 if __name__ == "__main__":

@@ -42,6 +42,14 @@ def render_source_settings(state: StudioCreateState):
             st.caption(f"{len(state.local_video_materials)} local materials cached in session")
 
     if state.video_source == "tiktok":
+        st.caption("Configure TikTok search provider and download limits in advanced source options.")
+
+    return uploaded_files
+
+
+def render_source_advanced_settings(state: StudioCreateState) -> None:
+    if state.video_source == "tiktok":
+        st.markdown("**TikTok search**")
         tiktok_providers = [
             (tr("SerpAPI"), "serpapi"),
             (tr("OpenAI Web Search"), "openai_web_search"),
@@ -89,7 +97,8 @@ def render_source_settings(state: StudioCreateState):
             value=config.app.get("tiktok_cookie_file", ""),
         ).strip()
 
-    return uploaded_files
+    st.markdown("**Video options**")
+    render_video_options(state)
 
 
 def render_video_options(state: StudioCreateState) -> None:
@@ -112,11 +121,14 @@ def render_video_options(state: StudioCreateState) -> None:
         (tr("SlideIn"), "SlideIn"),
         (tr("SlideOut"), "SlideOut"),
     ]
+    transition_values = [value for _, value in transition_modes]
     selected_transition = st.selectbox(
         tr("Video Transition Mode"),
         options=range(len(transition_modes)),
         format_func=lambda x: transition_modes[x][0],
-        index=0,
+        index=transition_values.index(state.video_transition_mode)
+        if state.video_transition_mode in transition_values
+        else 0,
     )
     state.video_transition_mode = transition_modes[selected_transition][1]
 
@@ -133,11 +145,21 @@ def render_video_options(state: StudioCreateState) -> None:
     state.video_clip_duration = st.selectbox(
         tr("Clip Duration"),
         options=[2, 3, 4, 5, 6, 7, 8, 9, 10],
-        index=1,
+        index=[2, 3, 4, 5, 6, 7, 8, 9, 10].index(state.video_clip_duration)
+        if state.video_clip_duration in [2, 3, 4, 5, 6, 7, 8, 9, 10]
+        else 1,
     )
     state.video_count = st.selectbox(
         tr("Number of Videos Generated Simultaneously"),
         options=[1, 2, 3, 4, 5],
-        index=0,
+        index=[1, 2, 3, 4, 5].index(state.video_count)
+        if state.video_count in [1, 2, 3, 4, 5]
+        else 0,
     )
-
+    state.n_threads = st.number_input(
+        "Threads",
+        min_value=1,
+        max_value=16,
+        value=int(state.n_threads or 2),
+        step=1,
+    )
