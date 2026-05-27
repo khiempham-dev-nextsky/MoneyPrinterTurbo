@@ -17,9 +17,7 @@ from webui.studio.state import StudioCreateState
 
 class TestRenderJobs(unittest.TestCase):
     def tearDown(self):
-        for key in ["studio_active_render_task_id", "studio_last_render_task_id"]:
-            if key in st.session_state:
-                del st.session_state[key]
+        render_jobs.clear_active_render_task()
 
     def test_start_render_job_records_active_task_and_starts_executor(self):
         started = []
@@ -58,6 +56,52 @@ class TestRenderJobs(unittest.TestCase):
         self.assertIsNotNone(active_snapshot)
         self.assertEqual(active_snapshot.task_id, snapshot.task_id)
         self.assertEqual(len(started), 1)
+
+    def test_active_snapshot_recovers_when_page_navigation_drops_active_session_key(self):
+        started = []
+
+        def background_runner(target, *args, **kwargs):
+            started.append((target, args, kwargs))
+
+        state = StudioCreateState(
+            video_subject="Local task",
+            video_script="Use a local clip.",
+            video_source="local",
+            local_video_materials=[
+                {"provider": "local", "url": "/tmp/local.mp4", "duration": 5}
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with patch.object(
+                render_jobs.utils,
+                "task_dir",
+                side_effect=lambda sub_dir="": str(Path(tmp_dir) / sub_dir)
+                if sub_dir
+                else str(Path(tmp_dir)),
+            ):
+                snapshot = render_jobs.start_render_job(
+                    state,
+                    uploaded_files=[],
+                    uploaded_audio_file=None,
+                    background_runner=background_runner,
+                )
+                sm.state.update_task(
+                    snapshot.task_id,
+                    state=const.TASK_STATE_PROCESSING,
+                    progress=45,
+                )
+                del st.session_state["studio_active_render_task_id"]
+
+                active_snapshot = render_jobs.get_active_render_snapshot()
+
+        self.assertIsNotNone(active_snapshot)
+        self.assertEqual(active_snapshot.task_id, snapshot.task_id)
+        self.assertEqual(active_snapshot.progress, 45)
+        self.assertEqual(
+            st.session_state["studio_active_render_task_id"],
+            snapshot.task_id,
+        )
 
     def test_append_render_log_writes_registry_and_task_log_file(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

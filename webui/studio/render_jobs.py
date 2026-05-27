@@ -24,6 +24,7 @@ from webui.studio.validators import validate_render_request
 
 _REGISTRY_LOCK = threading.Lock()
 _REGISTRY: dict[str, dict] = {}
+_ACTIVE_TASK_ID: str | None = None
 _MAX_LOG_LINES = 300
 
 
@@ -119,15 +120,25 @@ def get_render_snapshot(task_id: str, task_dir: str | None = None) -> StudioRend
 
 
 def get_active_render_snapshot() -> StudioRenderSnapshot | None:
-    task_id = st.session_state.get("studio_active_render_task_id")
+    task_id = (
+        st.session_state.get("studio_active_render_task_id")
+        or st.session_state.get("studio_last_render_task_id")
+        or _ACTIVE_TASK_ID
+    )
     if not task_id:
         return None
-    return get_render_snapshot(str(task_id))
+    task_id = str(task_id)
+    st.session_state["studio_active_render_task_id"] = task_id
+    return get_render_snapshot(task_id)
 
 
 def clear_active_render_task() -> None:
+    global _ACTIVE_TASK_ID
+    _ACTIVE_TASK_ID = None
     if "studio_active_render_task_id" in st.session_state:
         del st.session_state["studio_active_render_task_id"]
+    if "studio_last_render_task_id" in st.session_state:
+        del st.session_state["studio_last_render_task_id"]
 
 
 def persist_uploaded_audio(task_id: str, uploaded_audio_file) -> str:
@@ -202,6 +213,7 @@ def start_render_job(
     uploaded_audio_file,
     background_runner=_start_background_thread,
 ) -> StudioRenderSnapshot:
+    global _ACTIVE_TASK_ID
     task_id = str(uuid4())
     _task_dir(task_id)
 
@@ -220,6 +232,7 @@ def start_render_job(
     st.session_state["studio_active_render_task_id"] = task_id
     st.session_state["studio_last_render_task_id"] = task_id
     st.session_state["studio_render_autorefresh"] = True
+    _ACTIVE_TASK_ID = task_id
 
     config.save_config()
     _registry_record(task_id)
