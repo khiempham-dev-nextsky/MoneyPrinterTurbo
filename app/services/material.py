@@ -234,6 +234,9 @@ def download_videos(
     audio_duration: float = 0.0,
     max_clip_duration: int = 5,
 ) -> List[str]:
+    if source not in ("pexels", "pixabay"):
+        raise ValueError(f"unsupported stock video source: {source}")
+
     valid_video_items = []
     valid_video_urls = []
     found_duration = 0.0

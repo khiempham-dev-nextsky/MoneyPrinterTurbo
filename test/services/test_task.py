@@ -1,7 +1,8 @@
-import unittest
 import os
 import sys
+import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 # add project root to python path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -17,6 +18,117 @@ class TestTaskService(unittest.TestCase):
     
     def tearDown(self):
         pass
+
+    def test_get_video_materials_routes_tiktok_to_tiktok_service(self):
+        task_id = "00000000-0000-0000-0000-000000000000"
+        params = VideoParams(
+            video_subject="skincare review",
+            video_script="A creator reviews a skincare product.",
+            video_source="tiktok",
+            video_clip_duration=3,
+            video_count=1,
+            video_language="en-US",
+        )
+
+        with (
+            patch(
+                "app.services.task.tiktok.discover_and_download_videos",
+                return_value=["/tmp/tiktok.mp4"],
+            ) as discover,
+            patch("app.services.task.material.download_videos") as download_videos,
+        ):
+            result = tm.get_video_materials(
+                task_id=task_id,
+                params=params,
+                video_terms=[],
+                audio_duration=8,
+            )
+
+        self.assertEqual(result, ["/tmp/tiktok.mp4"])
+        download_videos.assert_not_called()
+        discover.assert_called_once_with(
+            task_id=task_id,
+            video_subject="skincare review",
+            video_script="A creator reviews a skincare product.",
+            video_language="en-US",
+            search_terms=[],
+            audio_duration=8,
+            max_clip_duration=3,
+        )
+
+    def test_start_generates_terms_for_tiktok_like_stock_sources(self):
+        task_id = "00000000-0000-0000-0000-000000000001"
+        params = VideoParams(
+            video_subject="sleep health",
+            video_script="Sleep early and avoid caffeine.",
+            video_source="tiktok",
+            video_clip_duration=3,
+            video_count=1,
+            voice_name="en-US-JennyNeural-Female",
+            bgm_type="",
+        )
+
+        with (
+            patch("app.services.task.llm.generate_terms", return_value=["sleep routine", "avoid caffeine"]) as generate_terms,
+            patch("app.services.task.generate_audio", return_value=("/tmp/audio.mp3", 5, None)),
+            patch("app.services.task.generate_subtitle", return_value=""),
+            patch("app.services.task.tiktok.discover_and_download_videos", return_value=["/tmp/tiktok.mp4"]) as discover,
+            patch("app.services.task.generate_final_videos", return_value=(["/tmp/final.mp4"], ["/tmp/combined.mp4"])),
+        ):
+            result = tm.start(task_id=task_id, params=params)
+
+        self.assertEqual(result["terms"], ["sleep routine", "avoid caffeine"])
+        generate_terms.assert_called_once()
+        discover.assert_called_once_with(
+            task_id=task_id,
+            video_subject="sleep health",
+            video_script="Sleep early and avoid caffeine.",
+            video_language="",
+            search_terms=["sleep routine", "avoid caffeine"],
+            audio_duration=5,
+            max_clip_duration=3,
+        )
+
+    def test_get_video_materials_routes_stock_sources_to_material_service(self):
+        params = VideoParams(
+            video_subject="cat",
+            video_script="A cat plays.",
+            video_source="pexels",
+            video_clip_duration=3,
+            video_count=1,
+        )
+
+        with patch(
+            "app.services.task.material.download_videos", return_value=["/tmp/pexels.mp4"]
+        ) as download_videos:
+            result = tm.get_video_materials(
+                task_id="task-id",
+                params=params,
+                video_terms=["cat"],
+                audio_duration=5,
+            )
+
+        self.assertEqual(result, ["/tmp/pexels.mp4"])
+        download_videos.assert_called_once()
+
+    def test_get_video_materials_rejects_unsupported_source(self):
+        params = VideoParams(
+            video_subject="cat",
+            video_script="A cat plays.",
+            video_source="douyin",
+            video_clip_duration=3,
+            video_count=1,
+        )
+
+        with self.assertRaises(ValueError) as cm:
+            tm.get_video_materials(
+                task_id="task-id",
+                params=params,
+                video_terms=[],
+                audio_duration=5,
+            )
+
+        self.assertIn("unsupported video_source: douyin", str(cm.exception))
     
     def test_task_local_materials(self):
         task_id = "00000000-0000-0000-0000-000000000000"
@@ -63,4 +175,4 @@ class TestTaskService(unittest.TestCase):
     
 
 if __name__ == "__main__":
-    unittest.main() 
+    unittest.main()

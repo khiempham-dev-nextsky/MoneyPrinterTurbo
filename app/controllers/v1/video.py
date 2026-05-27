@@ -30,6 +30,7 @@ from app.models.schema import (
     VideoMaterialRetrieveResponse
 )
 from app.services import state as sm
+from app.services import tiktok as tiktok_service
 from app.services import task as tm
 from app.utils import file_security, utils
 
@@ -141,6 +142,12 @@ def create_task(
     task_id = utils.get_uuid()
     request_id = base.get_task_id(request)
     try:
+        video_source = getattr(body, "video_source", None)
+        if video_source and video_source not in tm.VALID_VIDEO_SOURCES:
+            raise ValueError(f"unsupported video_source: {video_source}")
+        if stop_at == "video" and video_source == "tiktok":
+            tiktok_service.validate_tiktok_search_config()
+
         task = {
             "task_id": task_id,
             "request_id": request_id,

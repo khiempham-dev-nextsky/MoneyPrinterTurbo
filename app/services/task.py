@@ -8,9 +8,11 @@ from loguru import logger
 from app.config import config
 from app.models import const
 from app.models.schema import VideoConcatMode, VideoParams
-from app.services import llm, material, subtitle, video, voice, upload_post
+from app.services import llm, material, subtitle, tiktok, video, voice, upload_post
 from app.services import state as sm
 from app.utils import utils
+
+VALID_VIDEO_SOURCES = {"pexels", "pixabay", "local", "tiktok"}
 
 
 def generate_script(task_id, params):
@@ -174,7 +176,29 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
             )
             return None
         return [material_info.url for material_info in materials]
-    else:
+    elif params.video_source == "tiktok":
+        logger.info("\n\n## downloading videos from TikTok")
+        try:
+            downloaded_videos = tiktok.discover_and_download_videos(
+                task_id=task_id,
+                video_subject=params.video_subject,
+                video_script=params.video_script,
+                video_language=params.video_language,
+                search_terms=video_terms,
+                audio_duration=audio_duration * params.video_count,
+                max_clip_duration=params.video_clip_duration,
+            )
+        except Exception as e:
+            sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+            logger.error(f"failed to discover/download TikTok videos: {str(e)}")
+            return None
+
+        if not downloaded_videos:
+            sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+            logger.error("failed to discover/download TikTok videos")
+            return None
+        return downloaded_videos
+    elif params.video_source in ("pexels", "pixabay"):
         logger.info(f"\n\n## downloading videos from {params.video_source}")
         downloaded_videos = material.download_videos(
             task_id=task_id,
@@ -192,6 +216,8 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
             )
             return None
         return downloaded_videos
+
+    raise ValueError(f"unsupported video_source: {params.video_source}")
 
 
 def generate_final_videos(
@@ -254,6 +280,7 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
     if not video_script or "Error: " in video_script:
         sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
         return
+    params.video_script = video_script
 
     sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=10)
 
@@ -264,8 +291,12 @@ def start(task_id, params: VideoParams, stop_at: str = "video"):
         return {"script": video_script}
 
     # 2. Generate terms
+    if params.video_source not in VALID_VIDEO_SOURCES:
+        sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)
+        raise ValueError(f"unsupported video_source: {params.video_source}")
+
     video_terms = ""
-    if params.video_source != "local":
+    if params.video_source in ("pexels", "pixabay", "tiktok"):
         video_terms = generate_terms(task_id, params, video_script)
         if not video_terms:
             sm.state.update_task(task_id, state=const.TASK_STATE_FAILED)

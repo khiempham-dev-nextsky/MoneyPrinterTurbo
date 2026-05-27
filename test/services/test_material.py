@@ -113,6 +113,18 @@ class TestMaterialTlsVerification(unittest.TestCase):
             self.assertTrue(os.path.exists(video_path))
             self.assertTrue(get.call_args.kwargs["verify"])
 
+    def test_download_videos_rejects_unsupported_source(self):
+        with self.assertRaises(ValueError) as cm:
+            material.download_videos(
+                task_id="task-id",
+                search_terms=[],
+                source="tiktok",
+                audio_duration=10,
+                max_clip_duration=3,
+            )
+
+        self.assertIn("unsupported stock video source: tiktok", str(cm.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

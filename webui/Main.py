@@ -23,6 +23,7 @@ from app.models.schema import (
     VideoTransitionMode,
 )
 from app.services import llm, voice
+from app.services import tiktok as tiktok_service
 from app.services import task as tm
 from app.utils import utils
 
@@ -583,14 +584,15 @@ with middle_panel:
             (tr("Pexels"), "pexels"),
             (tr("Pixabay"), "pixabay"),
             (tr("Local file"), "local"),
-            (tr("TikTok"), "douyin"),
-            (tr("Bilibili"), "bilibili"),
-            (tr("Xiaohongshu"), "xiaohongshu"),
+            (tr("TikTok"), "tiktok"),
         ]
 
         saved_video_source_name = config.app.get("video_source", "pexels")
-        saved_video_source_index = [v[1] for v in video_sources].index(
-            saved_video_source_name
+        saved_video_source_values = [v[1] for v in video_sources]
+        saved_video_source_index = (
+            saved_video_source_values.index(saved_video_source_name)
+            if saved_video_source_name in saved_video_source_values
+            else 0
         )
 
         selected_index = st.selectbox(
@@ -610,6 +612,58 @@ with middle_panel:
                 type=local_file_types + [file_type.upper() for file_type in local_file_types],
                 accept_multiple_files=True,
             )
+
+        if params.video_source == "tiktok":
+            tiktok_providers = [
+                (tr("SerpAPI"), "serpapi"),
+                (tr("OpenAI Web Search"), "openai_web_search"),
+            ]
+            saved_tiktok_provider = config.app.get("tiktok_search_provider", "serpapi")
+            tiktok_provider_values = [v[1] for v in tiktok_providers]
+            saved_tiktok_provider_index = (
+                tiktok_provider_values.index(saved_tiktok_provider)
+                if saved_tiktok_provider in tiktok_provider_values
+                else 0
+            )
+            selected_tiktok_provider_index = st.selectbox(
+                tr("TikTok Search Provider"),
+                options=range(len(tiktok_providers)),
+                format_func=lambda x: tiktok_providers[x][0],
+                index=saved_tiktok_provider_index,
+            )
+            tiktok_provider = tiktok_providers[selected_tiktok_provider_index][1]
+            config.app["tiktok_search_provider"] = tiktok_provider
+            if tiktok_provider == "serpapi":
+                config.app["tiktok_search_api_key"] = st.text_input(
+                    tr("TikTok Search API Key"),
+                    value=config.app.get("tiktok_search_api_key", ""),
+                    type="password",
+                ).strip()
+            config.app["tiktok_max_search_results"] = st.number_input(
+                tr("TikTok Max Search Results"),
+                min_value=5,
+                max_value=50,
+                value=int(config.app.get("tiktok_max_search_results") or 20),
+                step=1,
+            )
+            config.app["tiktok_max_downloads"] = st.number_input(
+                tr("TikTok Max Downloads"),
+                min_value=1,
+                max_value=10,
+                value=int(config.app.get("tiktok_max_downloads") or 5),
+                step=1,
+            )
+            config.app["tiktok_min_duration"] = st.number_input(
+                tr("TikTok Min Duration"),
+                min_value=1,
+                max_value=30,
+                value=int(config.app.get("tiktok_min_duration") or 3),
+                step=1,
+            )
+            config.app["tiktok_cookie_file"] = st.text_input(
+                tr("TikTok Cookie File"),
+                value=config.app.get("tiktok_cookie_file", ""),
+            ).strip()
 
         selected_index = st.selectbox(
             tr("Video Concat Mode"),
@@ -1050,7 +1104,7 @@ if start_button:
         scroll_to_bottom()
         st.stop()
 
-    if params.video_source not in ["pexels", "pixabay", "local"]:
+    if params.video_source not in ["pexels", "pixabay", "local", "tiktok"]:
         st.error(tr("Please Select a Valid Video Source"))
         scroll_to_bottom()
         st.stop()
@@ -1064,6 +1118,19 @@ if start_button:
         st.error(tr("Please Enter the Pixabay API Key"))
         scroll_to_bottom()
         st.stop()
+
+    if params.video_source == "tiktok":
+        try:
+            tiktok_service.validate_tiktok_search_config()
+        except ValueError as exc:
+            if str(exc) == "openai_api_key is not set":
+                st.error(tr("Please Enter the OpenAI API Key"))
+            elif str(exc) == "tiktok_search_api_key is not set":
+                st.error(tr("Please Enter the TikTok Search API Key"))
+            else:
+                st.error(str(exc))
+            scroll_to_bottom()
+            st.stop()
 
     if uploaded_audio_file:
         task_dir = utils.task_dir(task_id)

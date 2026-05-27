@@ -55,6 +55,7 @@ audio_codec = "aac"
 audio_bitrate = "192k"
 video_codec = "libx264"
 fps = 30
+_MIN_OUTPUT_CLIP_DURATION = 1 / fps
 _BGM_EXTENSIONS = (".mp3",)
 
 
@@ -313,10 +314,9 @@ def combine_videos(
         while start_time < clip_duration:
             end_time = min(start_time + max_clip_duration, clip_duration)
 
-            # 保留所有有效分段。
-            # 这样既不会丢掉“整段视频本身就短于 max_clip_duration”的素材，
-            # 也不会吞掉长视频最后剩下的一小段尾部内容。
-            if end_time > start_time:
+            # 保留至少能产生一帧输出的有效分段，避免 0.01s 这类尾部碎片
+            # 被 MoviePy 写成无视频流 mp4，随后触发 ffmpeg concat 失败。
+            if end_time - start_time >= _MIN_OUTPUT_CLIP_DURATION:
                 subclipped_items.append(
                     SubClippedVideoClip(
                         file_path=video_path,
@@ -325,6 +325,11 @@ def combine_videos(
                         width=clip_w,
                         height=clip_h,
                     )
+                )
+            else:
+                logger.debug(
+                    f"skip sub-frame tail clip: {end_time - start_time:.4f}s, "
+                    f"file: {video_path}"
                 )
 
             start_time = end_time

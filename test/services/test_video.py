@@ -19,7 +19,7 @@ from app.controllers.manager.base_manager import TaskQueueFullError
 from app.controllers.manager.memory_manager import InMemoryTaskManager
 from app.controllers.v1 import video as video_controller
 from app.models import const
-from app.models.schema import MaterialInfo
+from app.models.schema import MaterialInfo, VideoConcatMode
 from app.services import state as sm
 from app.services import video as vd
 from app.utils import utils
@@ -226,6 +226,65 @@ class TestVideoService(unittest.TestCase):
                 )
 
         self.assertTrue(fake_audio_clip.reader.closed)
+
+    def test_combine_videos_skips_sub_frame_tail_clips(self):
+        """
+        Pexels 素材时长经常会比 max_clip_duration 多出 0.01s 这类尾巴。
+        这种短于一帧的片段会被 MoviePy 写成无视频流的 mp4，随后导致
+        ffmpeg concat 报 "Output file does not contain any stream"。
+        """
+        written_durations = []
+        concat_inputs = []
+
+        class _FakeReader:
+            def close(self):
+                pass
+
+        class _FakeClip:
+            def __init__(self, duration):
+                self.duration = duration
+                self.size = (1080, 1920)
+                self.w = 1080
+                self.h = 1920
+                self.reader = _FakeReader()
+                self.audio = None
+                self.mask = None
+                self.clips = []
+
+            def subclipped(self, start, end):
+                return _FakeClip(end - start)
+
+            def write_videofile(self, file_path, logger=None, fps=None, codec=None):
+                written_durations.append(self.duration)
+                Path(file_path).write_bytes(b"fake-video")
+
+        class _FakeAudioClip(_FakeClip):
+            def __init__(self):
+                super().__init__(10.5)
+
+        def _fake_concat(clip_files, output_file, threads, output_dir):
+            concat_inputs.extend(clip_files)
+            Path(output_file).write_bytes(b"fake-combined")
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            vd, "AudioFileClip", return_value=_FakeAudioClip()
+        ), patch.object(
+            vd, "VideoFileClip", return_value=_FakeClip(10.01)
+        ), patch.object(
+            vd, "concat_video_clips_with_ffmpeg", side_effect=_fake_concat
+        ):
+            output_path = os.path.join(temp_dir, "combined.mp4")
+
+            vd.combine_videos(
+                combined_video_path=output_path,
+                video_paths=["source.mp4"],
+                audio_file="audio.mp3",
+                video_concat_mode=VideoConcatMode.random,
+                max_clip_duration=10,
+            )
+
+        self.assertEqual(written_durations, [10])
+        self.assertEqual(len(concat_inputs), 2)
     
     def test_wrap_text(self):
         """test text wrapping function"""
