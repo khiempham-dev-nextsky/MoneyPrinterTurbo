@@ -286,6 +286,10 @@ api_key = ""
 # Whether to hide logs in the UI
 hide_log = false
 
+# Subtitle font file in resource/fonts.
+# BeVietnamPro-Bold.ttf is bundled and recommended for Vietnamese subtitles.
+# font_name = "BeVietnamPro-Bold.ttf"
+
 # 字幕位置设置 (Subtitle position settings)
 # 可选值 (Available values): "top", "center", "bottom", "custom"
 # subtitle_position = "custom"

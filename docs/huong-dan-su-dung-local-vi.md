@@ -363,6 +363,13 @@ Quy trinh co ban:
 8. Chon voice, BGM, subtitle style.
 9. Tao video va doi task hoan tat.
 
+Phông chữ phụ đề tiếng Việt:
+
+- WebUI tự liệt kê font trong `resource/fonts`; ô `Phông Chữ Phụ Đề` có thể gõ để tìm nhanh theo tên font.
+- App đã bundle `BeVietnamPro-Bold.ttf` và `BeVietnamPro-Regular.ttf`, nguồn từ Google Fonts/Be Vietnam Pro, license OFL.
+- Với giao diện hoặc video language tiếng Việt, nếu chưa lưu lựa chọn font cũ, WebUI ưu tiên `BeVietnamPro-Bold.ttf`.
+- Nếu tự thêm font khác, copy file `.ttf`, `.ttc` hoặc `.otf` vào `resource/fonts`, restart WebUI rồi tìm trong dropdown.
+
 Meo dung khong can LLM:
 
 - Tu nhap `Video Script`.

@@ -22,6 +22,7 @@ from app.models.schema import (
     VideoParams,
     VideoTransitionMode,
 )
+from app.services import fonts as font_service
 from app.services import llm, voice
 from app.services import tiktok as tiktok_service
 from app.services import task as tm
@@ -114,13 +115,7 @@ support_locales = [
 
 
 def get_all_fonts():
-    fonts = []
-    for root, dirs, files in os.walk(font_dir):
-        for file in files:
-            if file.endswith(".ttf") or file.endswith(".ttc"):
-                fonts.append(file)
-    fonts.sort()
-    return fonts
+    return font_service.list_font_names(font_dir)
 
 
 def get_all_songs():
@@ -967,12 +962,21 @@ with right_panel:
         st.write(tr("Subtitle Settings"))
         params.subtitle_enabled = st.checkbox(tr("Enable Subtitles"), value=True)
         font_names = get_all_fonts()
-        saved_font_name = config.ui.get("font_name", "MicrosoftYaHeiBold.ttc")
+        saved_font_name = config.ui.get("font_name", "")
+        default_font_name = font_service.select_default_font_name(
+            font_names=font_names,
+            saved_font_name=saved_font_name,
+            ui_language=st.session_state.get("ui_language", system_locale),
+            video_language=params.video_language,
+        )
         saved_font_name_index = 0
-        if saved_font_name in font_names:
-            saved_font_name_index = font_names.index(saved_font_name)
+        if default_font_name in font_names:
+            saved_font_name_index = font_names.index(default_font_name)
         params.font_name = st.selectbox(
-            tr("Font"), font_names, index=saved_font_name_index
+            tr("Font"),
+            font_names,
+            index=saved_font_name_index,
+            format_func=font_service.format_font_label,
         )
         config.ui["font_name"] = params.font_name
 
