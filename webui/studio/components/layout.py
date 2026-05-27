@@ -11,8 +11,8 @@ def render_top_bar() -> None:
             f"""
             <div class="studio-topbar">
               <div class="studio-title">
-                <strong>MoneyPrinterTurbo Studio v{config.project_version}</strong>
-                <span>Create, style, render, and review short videos from one workspace.</span>
+                <strong>MoneyPrinterTurbo Studio</strong>
+                <span>Studio v{config.project_version} · Create · Render · Review</span>
               </div>
             </div>
             """,
@@ -35,8 +35,17 @@ def page_header(title: str, description: str = "") -> None:
 
 
 def summary_block(items: list[tuple[str, str]]) -> None:
-    st.markdown('<div class="studio-summary">', unsafe_allow_html=True)
+    rows = []
     for label, value in items:
-        st.markdown(f"**{label}:** {value or '-'}")
-    st.markdown("</div>", unsafe_allow_html=True)
-
+        rows.append(
+            f"""
+            <div class="studio-summary-row">
+              <span class="studio-summary-label">{label}</span>
+              <span class="studio-summary-value">{value or '-'}</span>
+            </div>
+            """
+        )
+    st.markdown(
+        f"""<div class="studio-summary">{''.join(rows)}</div>""",
+        unsafe_allow_html=True,
+    )

@@ -13,11 +13,11 @@ from webui.studio.components import layout
 def _render_preset_preview(preset: SubtitlePreset) -> None:
     st.markdown(
         f"""
-        <div style="background:#111827;border-radius:8px;padding:24px;text-align:center;">
+        <div style="background:var(--studio-surface-card);border:1px solid var(--studio-hairline);border-radius:0px;padding:24px;text-align:center;">
           <span style="
             color:{preset.text_fore_color};
             font-size:{min(preset.font_size, 72)}px;
-            font-weight:700;
+            font-weight:400;
             text-shadow:0 0 {max(preset.stroke_width, 0.5) * 2}px {preset.stroke_color};
           ">{preset.name}</span>
         </div>
@@ -80,4 +80,3 @@ def render_page() -> None:
             save_subtitle_presets(bootstrap.brand_presets_file, presets)
             st.success("Preset saved")
             st.rerun()
-
