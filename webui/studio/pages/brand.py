@@ -13,11 +13,11 @@ from webui.studio.components import layout
 def _render_preset_preview(preset: SubtitlePreset) -> None:
     st.markdown(
         f"""
-        <div style="background:var(--studio-surface-card);border:1px solid var(--studio-hairline);border-radius:0px;padding:24px;text-align:center;">
+        <div class="studio-subtitle-preview">
           <span style="
             color:{preset.text_fore_color};
-            font-size:{min(preset.font_size, 72)}px;
-            font-weight:400;
+            font-size:{min(preset.font_size, 38)}px;
+            font-weight:600;
             text-shadow:0 0 {max(preset.stroke_width, 0.5) * 2}px {preset.stroke_color};
           ">{preset.name}</span>
         </div>
@@ -37,46 +37,51 @@ def render_page() -> None:
         save_subtitle_presets(bootstrap.brand_presets_file, presets)
         st.rerun()
 
-    selected_name = st.selectbox("Preset", options=[preset.name for preset in presets])
-    selected = next(preset for preset in presets if preset.name == selected_name)
-    _render_preset_preview(selected)
+    with layout.section_card():
+        selected_name = st.selectbox("Preset", options=[preset.name for preset in presets])
+        selected = next(preset for preset in presets if preset.name == selected_name)
+        _render_preset_preview(selected)
 
-    with st.form("studio_new_subtitle_preset"):
-        st.subheader("Create subtitle preset")
-        name = st.text_input("Name")
-        font_name = st.text_input("Font file", value=selected.font_name)
-        font_size = st.slider("Font size", 30, 100, selected.font_size)
-        text_fore_color = st.color_picker("Font color", selected.text_fore_color)
-        stroke_color = st.color_picker("Stroke color", selected.stroke_color)
-        stroke_width = st.slider("Stroke width", 0.0, 10.0, float(selected.stroke_width))
-        subtitle_position = st.selectbox(
-            "Position",
-            options=["top", "center", "bottom", "custom"],
-            index=["top", "center", "bottom", "custom"].index(selected.subtitle_position)
-            if selected.subtitle_position in ["top", "center", "bottom", "custom"]
-            else 2,
-        )
-        custom_position = st.number_input(
-            "Custom position",
-            min_value=0.0,
-            max_value=100.0,
-            value=float(selected.custom_position),
-        )
-        submitted = st.form_submit_button("Save Preset")
-        if submitted and name.strip():
-            presets = [preset for preset in presets if preset.name != name.strip()]
-            presets.append(
-                SubtitlePreset(
-                    name=name.strip(),
-                    font_name=font_name.strip(),
-                    font_size=int(font_size),
-                    text_fore_color=text_fore_color,
-                    stroke_color=stroke_color,
-                    stroke_width=float(stroke_width),
-                    subtitle_position=subtitle_position,
-                    custom_position=float(custom_position),
-                )
+    with layout.section_card():
+        with st.form("studio_new_subtitle_preset"):
+            st.subheader("Create subtitle preset")
+            name = st.text_input("Name")
+            font_name = st.text_input("Font file", value=selected.font_name)
+            font_size = st.slider("Font size", 30, 100, selected.font_size)
+            color_col, stroke_col = st.columns(2)
+            with color_col:
+                text_fore_color = st.color_picker("Font color", selected.text_fore_color)
+            with stroke_col:
+                stroke_color = st.color_picker("Stroke color", selected.stroke_color)
+            stroke_width = st.slider("Stroke width", 0.0, 10.0, float(selected.stroke_width))
+            subtitle_position = st.selectbox(
+                "Position",
+                options=["top", "center", "bottom", "custom"],
+                index=["top", "center", "bottom", "custom"].index(selected.subtitle_position)
+                if selected.subtitle_position in ["top", "center", "bottom", "custom"]
+                else 2,
             )
-            save_subtitle_presets(bootstrap.brand_presets_file, presets)
-            st.success("Preset saved")
-            st.rerun()
+            custom_position = st.number_input(
+                "Custom position",
+                min_value=0.0,
+                max_value=100.0,
+                value=float(selected.custom_position),
+            )
+            submitted = st.form_submit_button("Save Preset")
+            if submitted and name.strip():
+                presets = [preset for preset in presets if preset.name != name.strip()]
+                presets.append(
+                    SubtitlePreset(
+                        name=name.strip(),
+                        font_name=font_name.strip(),
+                        font_size=int(font_size),
+                        text_fore_color=text_fore_color,
+                        stroke_color=stroke_color,
+                        stroke_width=float(stroke_width),
+                        subtitle_position=subtitle_position,
+                        custom_position=float(custom_position),
+                    )
+                )
+                save_subtitle_presets(bootstrap.brand_presets_file, presets)
+                st.success("Preset saved")
+                st.rerun()

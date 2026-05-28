@@ -9,23 +9,24 @@ from webui.studio.components import layout
 
 
 def _render_assets_table(title: str, records) -> None:
-    st.subheader(title)
-    if not records:
-        st.info("No assets found.")
-        return
-    st.dataframe(
-        [
-            {
-                "Name": item.name,
-                "Provider": item.provider,
-                "Size KB": round(item.size_bytes / 1024, 1),
-                "Path": item.path,
-            }
-            for item in records
-        ],
-        use_container_width=True,
-        hide_index=True,
-    )
+    with layout.section_card():
+        st.subheader(title)
+        if not records:
+            st.info("No assets found.")
+            return
+        st.dataframe(
+            [
+                {
+                    "Name": item.name,
+                    "Provider": item.provider,
+                    "Size KB": round(item.size_bytes / 1024, 1),
+                    "Path": layout.truncate_middle(item.path, 72),
+                }
+                for item in records
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 def render_page() -> None:
@@ -35,15 +36,20 @@ def render_page() -> None:
     )
 
     diagnostics = get_source_diagnostics(dict(config.app))
-    st.subheader("Source diagnostics")
-    st.dataframe(
-        [
-            {"Source": item.name, "State": item.state, "Detail": item.detail}
-            for item in diagnostics
-        ],
-        use_container_width=True,
-        hide_index=True,
-    )
+    with layout.section_card():
+        st.subheader("Source diagnostics")
+        st.dataframe(
+            [
+                {
+                    "Source": item.name,
+                    "State": item.state,
+                    "Detail": layout.truncate_middle(item.detail, 88),
+                }
+                for item in diagnostics
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
     local_records = scan_asset_directory(
         Path(bootstrap.root_dir) / "storage" / "local_videos",
@@ -55,4 +61,3 @@ def render_page() -> None:
     )
     _render_assets_table("Local uploads", local_records)
     _render_assets_table("TikTok cache", tiktok_records)
-

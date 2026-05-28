@@ -2,10 +2,13 @@ import sys
 import subprocess
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from webui.studio.components import layout
 
 
 class TestStudioAppSmoke(unittest.TestCase):
@@ -50,7 +53,7 @@ class TestStudioAppSmoke(unittest.TestCase):
             visible_values,
         )
         self.assertTrue(
-            any("DESIGN.md" in value for value in markdown_values),
+            any("Studio v" in value for value in markdown_values),
             markdown_values,
         )
 
@@ -67,10 +70,18 @@ class TestStudioAppSmoke(unittest.TestCase):
         self.assertIn("render_sidebar", navigation_source)
         self.assertIn("studio_sidebar_collapsed", navigation_source)
         self.assertIn("studio-nav-button", navigation_source)
-        self.assertIn('"canvas": "#000000"', theme_source)
-        self.assertIn('"hairline": "#262626"', theme_source)
-        self.assertIn("border-radius: 0px", theme_source)
-        self.assertIn("letter-spacing: 2", theme_source)
+        self.assertIn("@media (max-width: 700px)", navigation_source)
+        self.assertIn("width: 72px", navigation_source)
+        self.assertIn('[data-testid="stVerticalBlock"]', navigation_source)
+        self.assertIn("padding-left: 88px", navigation_source)
+        self.assertNotIn("font-size: 0 !important", navigation_source)
+        self.assertIn('"primary": "#0066cc"', theme_source)
+        self.assertIn('"canvas": "#ffffff"', theme_source)
+        self.assertIn('"canvas_parchment": "#f5f5f7"', theme_source)
+        self.assertIn('"surface_card": "#ffffff"', theme_source)
+        self.assertIn('"ink": "#1d1d1f"', theme_source)
+        self.assertNotIn('"canvas": "#000000"', theme_source)
+        self.assertNotIn("black canvas", theme_source)
 
     def test_custom_shell_renders_each_studio_page(self):
         app_path = Path(__file__).parent.parent.parent / "webui" / "Main.py"
@@ -103,12 +114,15 @@ class TestStudioAppSmoke(unittest.TestCase):
 
         self.assertEqual(app.exception, [])
         sidebar_labels = [button.label for button in app.sidebar.button]
-        self.assertIn("+", sidebar_labels)
-        self.assertIn("P", sidebar_labels)
-        self.assertIn("A", sidebar_labels)
-        self.assertIn("B", sidebar_labels)
-        self.assertIn("S", sidebar_labels)
-        self.assertNotIn("+  Create", sidebar_labels)
+        sidebar_icons = [button.icon for button in app.sidebar.button]
+        self.assertEqual(sidebar_labels, ["", "", "", "", "", ""])
+        self.assertIn(":material/menu:", sidebar_icons)
+        self.assertIn(":material/add_circle:", sidebar_icons)
+        self.assertIn(":material/folder_open:", sidebar_icons)
+        self.assertIn(":material/perm_media:", sidebar_icons)
+        self.assertIn(":material/format_paint:", sidebar_icons)
+        self.assertIn(":material/tune:", sidebar_icons)
+        self.assertNotIn("P  Projects", sidebar_labels)
 
     def test_create_page_source_no_longer_uses_tabbed_workflow(self):
         create_source = (
@@ -118,6 +132,67 @@ class TestStudioAppSmoke(unittest.TestCase):
         self.assertNotIn("st.tabs", create_source)
         self.assertNotIn('"1. Brief"', create_source)
         self.assertNotIn('"6. Review & Render"', create_source)
+        self.assertIn("layout.section_card", create_source)
+
+    def test_summary_block_generates_renderable_inline_html(self):
+        with patch.object(layout.st, "markdown") as markdown:
+            layout.summary_block([("Subject", ""), ("Source", "tiktok")])
+
+        html = markdown.call_args.args[0]
+        kwargs = markdown.call_args.kwargs
+        self.assertTrue(kwargs["unsafe_allow_html"])
+        self.assertNotIn("\n            <div", html)
+        self.assertIn('<span class="studio-summary-value" title="-">-</span>', html)
+        self.assertIn(
+            '<span class="studio-summary-value" title="tiktok">tiktok</span>',
+            html,
+        )
+
+    def test_theme_uses_readable_system_fonts_for_operational_controls(self):
+        theme_source = (
+            Path(__file__).parent.parent.parent / "webui" / "studio" / "theme.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("-apple-system, BlinkMacSystemFont", theme_source)
+        self.assertNotIn("Cormorant Garamond", theme_source)
+        self.assertNotIn("text-transform: uppercase !important", theme_source)
+        self.assertNotIn("letter-spacing: 2.5px", theme_source)
+        self.assertIn(
+            'button[data-testid="stBaseButton-primary"] [data-testid="stMarkdownContainer"]',
+            theme_source,
+        )
+        self.assertIn(
+            '[data-testid="stWidgetLabel"] .colored-text',
+            theme_source,
+        )
+
+    def test_layout_helpers_keep_long_paths_readable(self):
+        long_path = "/Users/example/MoneyPrinterTurbo/storage/tasks/abc/final-video-output.mp4"
+
+        truncated = layout.truncate_middle(long_path, max_length=42)
+
+        self.assertLessEqual(len(truncated), 42)
+        self.assertTrue(truncated.startswith("/Users/example"))
+        self.assertTrue(truncated.endswith("final-video-output.mp4"))
+        self.assertIn("...", truncated)
+
+    def test_project_asset_brand_pages_use_light_layout_primitives(self):
+        root = Path(__file__).parent.parent.parent
+        project_source = (root / "webui" / "studio" / "pages" / "projects.py").read_text(
+            encoding="utf-8"
+        )
+        assets_source = (root / "webui" / "studio" / "pages" / "assets.py").read_text(
+            encoding="utf-8"
+        )
+        brand_source = (root / "webui" / "studio" / "pages" / "brand.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("layout.truncate_middle", project_source)
+        self.assertIn("layout.section_card", project_source)
+        self.assertIn("layout.truncate_middle", assets_source)
+        self.assertIn("layout.section_card", assets_source)
+        self.assertIn("studio-subtitle-preview", brand_source)
 
 
 if __name__ == "__main__":
