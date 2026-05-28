@@ -116,8 +116,9 @@ class TestStudioProjects(unittest.TestCase):
 
         expected_components = [
             "_render_projects_toolbar",
-            "_render_task_list",
-            "_render_task_detail_panel",
+            "_render_task_table",
+            "_render_task_detail_modal",
+            "_render_task_detail_content",
             "_render_video_preview_card",
             "_render_task_action_group",
             "_render_script_keywords_panel",
@@ -126,7 +127,15 @@ class TestStudioProjects(unittest.TestCase):
         ]
         for component in expected_components:
             self.assertIn(component, projects_source)
-        self.assertNotIn("st.dataframe", projects_source)
+        self.assertIn('st.dialog("Task đang chọn"', projects_source)
+        self.assertIn('icon=":material/visibility:"', projects_source)
+        self.assertIn('help="Xem chi tiết"', projects_source)
+        self.assertIn("studio-task-table-header", projects_source)
+        self.assertIn("studio-task-table-row", projects_source)
+        self.assertIn("studio-task-detail-dialog-marker", projects_source)
+        self.assertIn("studio-task-detail-content-marker", projects_source)
+        self.assertNotIn("list_col, detail_col", projects_source)
+        self.assertNotIn("studio-task-card", projects_source)
         self.assertNotIn("Preview task", projects_source)
 
     def test_project_dashboard_theme_defines_badges_and_preview_states(self):
@@ -139,7 +148,13 @@ class TestStudioProjects(unittest.TestCase):
             "studio-badge-status-rendering",
             "studio-badge-status-failed",
             "studio-badge-source-tiktok",
-            "studio-task-card",
+            "studio-task-table-header",
+            "studio-task-table-row",
+            "studio-task-table-title",
+            "studio-task-detail-dialog-marker",
+            "studio-task-detail-content-marker",
+            "overflow-y: auto",
+            "align-items: center",
             "studio-project-meta-grid",
             "studio-project-preview-empty",
             "studio-project-log-dialog-marker",

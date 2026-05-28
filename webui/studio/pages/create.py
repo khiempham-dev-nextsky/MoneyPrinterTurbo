@@ -259,7 +259,6 @@ else:
 
 
 def _render_render_rail(state, uploaded_files, uploaded_audio_file) -> None:
-    st.markdown('<div class="studio-sticky-render-anchor"></div>', unsafe_allow_html=True)
     st.markdown('<div class="studio-render-card-marker"></div>', unsafe_allow_html=True)
     st.markdown(
         """

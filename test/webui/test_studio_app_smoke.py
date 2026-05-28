@@ -136,14 +136,39 @@ class TestStudioAppSmoke(unittest.TestCase):
             Path(__file__).parent.parent.parent / "webui" / "studio" / "theme.py"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("studio-sticky-render-anchor", theme_source)
+        self.assertIn('div[data-testid="stColumn"]:has(.studio-render-card-marker)', theme_source)
         self.assertIn("position: sticky", theme_source)
+        self.assertIn("align-self: flex-start", theme_source)
+        self.assertIn("max-height: calc(100vh - 40px)", theme_source)
+        self.assertIn("overflow-y: auto", theme_source)
+        self.assertNotIn("studio-sticky-render-anchor", theme_source)
         self.assertIn("aspect-ratio: 9 / 16", theme_source)
         self.assertIn("studio-video-preview-frame", theme_source)
         self.assertIn("studio-summary-row", theme_source)
         self.assertIn("max-width: none", theme_source)
         self.assertIn("padding-left: 16px", theme_source)
         self.assertIn("studio-log-dialog-marker", theme_source)
+
+    def test_card_padding_is_scoped_to_studio_cards(self):
+        theme_source = (
+            Path(__file__).parent.parent.parent / "webui" / "studio" / "theme.py"
+        ).read_text(encoding="utf-8")
+
+        shared_card_rule = (
+            'div[data-testid="stVerticalBlockBorderWrapper"]:has(.studio-section-card-marker),\n'
+            '        div[data-testid="stVerticalBlockBorderWrapper"]:has(.studio-render-card-marker)'
+        )
+        self.assertNotIn(shared_card_rule, theme_source)
+        self.assertIn(
+            'has(> div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] .studio-section-card-marker)',
+            theme_source,
+        )
+        self.assertIn(
+            'has(> div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] .studio-render-card-marker)',
+            theme_source,
+        )
+        self.assertIn("padding: 18px", theme_source)
+        self.assertIn("padding: 12px", theme_source)
 
     def test_studio_navigation_uses_plain_text_labels(self):
         navigation_source = (
@@ -156,9 +181,17 @@ class TestStudioAppSmoke(unittest.TestCase):
         bootstrap_source = (
             Path(__file__).parent.parent.parent / "webui" / "studio" / "bootstrap.py"
         ).read_text(encoding="utf-8")
+        theme_source = (
+            Path(__file__).parent.parent.parent / "webui" / "studio" / "theme.py"
+        ).read_text(encoding="utf-8")
 
         self.assertIn('initial_sidebar_state="auto"', bootstrap_source)
         self.assertNotIn('initial_sidebar_state="expanded"', bootstrap_source)
+        self.assertIn('[data-testid="stSidebar"]', theme_source)
+        self.assertIn('[data-testid="stSidebarContent"]', theme_source)
+        self.assertIn("width: 250px", theme_source)
+        self.assertIn("min-width: 250px", theme_source)
+        self.assertIn("max-width: 250px", theme_source)
 
 
 if __name__ == "__main__":

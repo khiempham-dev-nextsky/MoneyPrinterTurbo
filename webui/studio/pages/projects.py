@@ -229,42 +229,71 @@ def _render_no_selected_task_state() -> None:
     st.info("Chọn một task để xem chi tiết.")
 
 
-def _render_task_list(tasks: list[dict], selected_task_id: str | None) -> str | None:
+def _render_task_table_header() -> None:
+    st.markdown('<div class="studio-task-table-header"></div>', unsafe_allow_html=True)
+    columns = st.columns([3, 1, 1, 0.8, 1.2, 1.35, 1], gap="small")
+    labels = ["Subject", "Source", "Status", "Videos", "Progress", "Updated", "Action"]
+    for column, label in zip(columns, labels):
+        with column:
+            st.markdown(f'<div class="studio-task-table-heading">{escape(label)}</div>', unsafe_allow_html=True)
+
+
+def _render_progress_indicator(progress: int) -> str:
+    return f"""
+    <div class="studio-task-table-progress">
+      <div style="width:{progress}%"></div>
+    </div>
+    <span class="studio-task-table-muted">{progress}%</span>
+    """
+
+
+def _render_task_table(tasks: list[dict]) -> None:
     st.markdown("### Task list")
     if not tasks:
         st.warning("Không tìm thấy task phù hợp với bộ lọc hiện tại.")
-        return None
+        return
 
-    selected_task_id = selected_task_id if any(item["task_id"] == selected_task_id for item in tasks) else tasks[0]["task_id"]
+    _render_task_table_header()
     for item in tasks:
-        is_active = item["task_id"] == selected_task_id
+        progress = task_progress(item)
         with st.container(border=True):
-            st.markdown('<div class="studio-task-list-card-marker"></div>', unsafe_allow_html=True)
-            st.markdown(
-                f"""
-                <div class="studio-task-card {'studio-task-card-active' if is_active else ''}">
-                  <div class="studio-task-title">{escape(task_title(item))}</div>
-                  <div class="studio-task-meta">
-                    {_task_badges(item)}
-                    <span>{len(item.get("videos") or [])} video</span>
-                    <span>{short_task_id(item.get("task_id", ""))}</span>
-                  </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            progress = task_progress(item)
-            st.progress(progress / 100)
-            st.caption(f"Progress: {progress}%")
-            if st.button(
-                "Xem chi tiết" if not is_active else "Đang chọn",
-                key=f"studio_project_select_{item['task_id']}",
-                disabled=is_active,
-                use_container_width=True,
-            ):
-                st.session_state["studio_selected_project_task_id"] = item["task_id"]
-                selected_task_id = item["task_id"]
-    return selected_task_id
+            st.markdown('<div class="studio-task-table-row"></div>', unsafe_allow_html=True)
+            columns = st.columns([3, 1, 1, 0.8, 1.2, 1.35, 1], gap="small")
+            with columns[0]:
+                st.markdown(
+                    f"""
+                    <div class="studio-task-table-title">{escape(task_title(item))}</div>
+                    <div class="studio-task-table-muted">{escape(short_task_id(item.get("task_id", "")))}</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with columns[1]:
+                source_key = source_label(item).lower()
+                st.markdown(_badge(source_label(item), f"studio-badge-source-{source_key}"), unsafe_allow_html=True)
+            with columns[2]:
+                st.markdown(_badge(task_status_label(item), f"studio-badge-status-{task_status_key(item)}"), unsafe_allow_html=True)
+            with columns[3]:
+                st.markdown(
+                    f'<span class="studio-task-table-muted">{len(item.get("videos") or [])}</span>',
+                    unsafe_allow_html=True,
+                )
+            with columns[4]:
+                st.markdown(_render_progress_indicator(progress), unsafe_allow_html=True)
+            with columns[5]:
+                st.markdown(
+                    f'<span class="studio-task-table-muted">{escape(modified_time_label(item))}</span>',
+                    unsafe_allow_html=True,
+                )
+            with columns[6]:
+                if st.button(
+                    " ",
+                    icon=":material/visibility:",
+                    help="Xem chi tiết",
+                    key=f"studio_project_detail_{item['task_id']}",
+                    use_container_width=True,
+                ):
+                    st.session_state["studio_selected_project_task_id"] = item["task_id"]
+                    _render_task_detail_modal(item)
 
 
 def _render_video_preview_card(selected: dict) -> None:
@@ -372,7 +401,8 @@ def _render_task_metadata(selected: dict) -> None:
         st.error(render_log_summary(selected))
 
 
-def _render_task_detail_panel(selected: dict | None) -> None:
+def _render_task_detail_content(selected: dict | None) -> None:
+    st.markdown('<div class="studio-task-detail-content-marker"></div>', unsafe_allow_html=True)
     st.markdown("### Task đang chọn")
     if not selected:
         _render_no_selected_task_state()
@@ -384,6 +414,12 @@ def _render_task_detail_panel(selected: dict | None) -> None:
         _render_task_action_group(selected)
         _render_script_keywords_panel(selected)
         _render_render_log_panel(selected)
+
+
+@st.dialog("Task đang chọn", width="large")
+def _render_task_detail_modal(selected: dict) -> None:
+    st.markdown('<div class="studio-task-detail-dialog-marker"></div>', unsafe_allow_html=True)
+    _render_task_detail_content(selected)
 
 
 def render_page() -> None:
@@ -399,14 +435,4 @@ def render_page() -> None:
 
     search_query, source_filter, status_filter, sort_option = _render_projects_toolbar(outputs)
     filtered = filter_and_sort_tasks(outputs, search_query, source_filter, status_filter, sort_option)
-    selected_task_id = st.session_state.get("studio_selected_project_task_id")
-
-    list_col, detail_col = st.columns([4, 6], gap="small")
-    with list_col:
-        selected_task_id = _render_task_list(filtered, selected_task_id)
-        if selected_task_id:
-            st.session_state["studio_selected_project_task_id"] = selected_task_id
-
-    selected = next((item for item in filtered if item["task_id"] == selected_task_id), None)
-    with detail_col:
-        _render_task_detail_panel(selected)
+    _render_task_table(filtered)

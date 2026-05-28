@@ -39,6 +39,12 @@ def apply_theme() -> None:
             padding-left: 16px !important;
             padding-right: 16px !important;
         }}
+        [data-testid="stSidebar"],
+        [data-testid="stSidebarContent"] {{
+            max-width: 250px !important;
+            min-width: 250px !important;
+            width: 250px !important;
+        }}
         .studio-topbar {{
             display: flex;
             align-items: center;
@@ -124,15 +130,24 @@ def apply_theme() -> None:
             color: {STUDIO_COLORS["muted"]};
             margin: 0;
         }}
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.studio-section-card-marker),
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(.studio-render-card-marker) {{
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(> div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] .studio-section-card-marker),
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(> div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] .studio-render-card-marker) {{
             background: {STUDIO_COLORS["surface"]};
             border-color: {STUDIO_COLORS["border"]};
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(> div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] .studio-section-card-marker) {{
             padding: 18px;
         }}
-        [data-testid="stVerticalBlock"]:has(.studio-sticky-render-anchor) {{
+        div[data-testid="stColumn"]:has(.studio-render-card-marker) {{
+            align-self: flex-start;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
             position: sticky;
-            top: 22px;
+            top: 20px;
+            z-index: 4;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(> div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] .studio-render-card-marker) {{
+            padding: 12px;
         }}
         .studio-render-card-title {{
             margin: 0 0 10px;
@@ -230,27 +245,69 @@ def apply_theme() -> None:
             background: #EFF6FF;
             color: #1D4ED8;
         }}
-        .studio-task-card {{
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+        .studio-task-table-header {{
+            display: none;
         }}
-        .studio-task-card-active .studio-task-title {{
-            color: {STUDIO_COLORS["primary"]};
+        .studio-task-table-heading {{
+            color: {STUDIO_COLORS["muted"]};
+            font-size: 0.76rem;
+            font-weight: 750;
+            letter-spacing: 0;
+            padding: 0 6px 4px;
+            text-transform: uppercase;
         }}
-        .studio-task-title {{
+        .studio-task-table-row {{
+            display: none;
+        }}
+        div[data-testid="stVerticalBlockBorderWrapper"]:has(.studio-task-table-row) {{
+            background: {STUDIO_COLORS["surface"]};
+            border-color: {STUDIO_COLORS["border"]};
+            padding: 10px 14px;
+        }}
+        .studio-task-table-title {{
             color: {STUDIO_COLORS["text"]};
-            font-size: 0.98rem;
+            font-size: 0.92rem;
             font-weight: 750;
             line-height: 1.35;
+            overflow-wrap: anywhere;
         }}
-        .studio-task-meta {{
-            align-items: center;
+        .studio-task-table-muted {{
             color: {STUDIO_COLORS["muted"]};
-            display: flex;
-            flex-wrap: wrap;
-            font-size: 0.78rem;
-            gap: 7px;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }}
+        .studio-task-table-progress {{
+            background: {STUDIO_COLORS["surface_alt"]};
+            border-radius: 999px;
+            height: 7px;
+            margin: 4px 0 3px;
+            overflow: hidden;
+            width: 100%;
+        }}
+        .studio-task-table-progress div {{
+            background: {STUDIO_COLORS["primary"]};
+            height: 100%;
+        }}
+        .studio-task-detail-dialog-marker,
+        .studio-task-detail-content-marker {{
+            display: none;
+        }}
+        div:has(.studio-task-detail-dialog-marker) {{
+            align-items: center !important;
+            padding-top: 0 !important;
+        }}
+        div[role="dialog"]:has(.studio-task-detail-dialog-marker) {{
+            margin-top: 0 !important;
+            max-height: min(86vh, 920px);
+            overflow-x: hidden;
+            overflow-y: auto;
+            width: min(92vw, 920px);
+        }}
+        div[role="dialog"]:has(.studio-task-detail-dialog-marker)
+            div[data-testid="stVerticalBlock"]:has(.studio-task-detail-content-marker) {{
+            max-height: 72vh;
+            overflow-y: auto;
+            padding-right: 8px;
         }}
         .studio-project-detail-header {{
             display: flex;
