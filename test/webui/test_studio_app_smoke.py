@@ -142,7 +142,7 @@ class TestStudioAppSmoke(unittest.TestCase):
         self.assertIn("studio-video-preview-frame", theme_source)
         self.assertIn("studio-summary-row", theme_source)
         self.assertIn("max-width: none", theme_source)
-        self.assertIn("padding-left: 6px", theme_source)
+        self.assertIn("padding-left: 16px", theme_source)
         self.assertIn("studio-log-dialog-marker", theme_source)
 
     def test_studio_navigation_uses_plain_text_labels(self):

@@ -6,7 +6,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from app.models import const
 from webui.studio.components.status import list_task_outputs, read_task_script_data
+from webui.studio.pages import projects
 
 
 class TestStudioProjects(unittest.TestCase):
@@ -57,6 +59,93 @@ class TestStudioProjects(unittest.TestCase):
         self.assertEqual(outputs[0]["videos"], [])
         self.assertEqual(outputs[0]["log_path"], str(task_dir / "studio-render.log"))
         self.assertIn("Downloading materials", outputs[0]["log_excerpt"])
+
+    def test_project_task_view_helpers_create_scan_friendly_metadata(self):
+        item = {
+            "task_id": "d3a67136-f7ad-4f77-97b4-7d0d733c2a8d",
+            "subject": "",
+            "script": "Một giấc ngủ ngon bắt đầu từ những thói quen nhỏ.",
+            "source": "tiktok",
+            "videos": ["final-1.mp4"],
+            "progress": 100,
+            "state": None,
+        }
+
+        self.assertEqual(projects.task_title(item), "Một giấc ngủ ngon bắt đầu từ những thói quen nhỏ.")
+        self.assertEqual(projects.short_task_id(item["task_id"]), "d3a67136...")
+        self.assertEqual(projects.task_status_key(item), "done")
+        self.assertEqual(projects.task_status_label(item), "Done")
+        self.assertEqual(projects.source_label(item), "TikTok")
+
+    def test_project_filters_searches_and_sorts_tasks(self):
+        tasks = [
+            {
+                "task_id": "old-pexels",
+                "subject": "Office planning",
+                "source": "pexels",
+                "videos": [],
+                "progress": 0,
+                "state": None,
+                "modified_time": 10,
+            },
+            {
+                "task_id": "new-tiktok",
+                "subject": "Sleep routine",
+                "source": "tiktok",
+                "videos": ["final-1.mp4"],
+                "progress": 100,
+                "state": const.TASK_STATE_COMPLETE,
+                "modified_time": 20,
+            },
+        ]
+
+        filtered = projects.filter_and_sort_tasks(
+            tasks,
+            search_query="sleep",
+            source_filter="TikTok",
+            status_filter="Done",
+            sort_option="Newest",
+        )
+
+        self.assertEqual([item["task_id"] for item in filtered], ["new-tiktok"])
+
+    def test_project_page_source_defines_dashboard_components(self):
+        projects_source = (
+            Path(__file__).parent.parent.parent / "webui" / "studio" / "pages" / "projects.py"
+        ).read_text(encoding="utf-8")
+
+        expected_components = [
+            "_render_projects_toolbar",
+            "_render_task_list",
+            "_render_task_detail_panel",
+            "_render_video_preview_card",
+            "_render_task_action_group",
+            "_render_script_keywords_panel",
+            "_render_render_log_panel",
+            "_render_empty_projects_state",
+        ]
+        for component in expected_components:
+            self.assertIn(component, projects_source)
+        self.assertNotIn("st.dataframe", projects_source)
+        self.assertNotIn("Preview task", projects_source)
+
+    def test_project_dashboard_theme_defines_badges_and_preview_states(self):
+        theme_source = (
+            Path(__file__).parent.parent.parent / "webui" / "studio" / "theme.py"
+        ).read_text(encoding="utf-8")
+
+        expected_classes = [
+            "studio-badge-status-done",
+            "studio-badge-status-rendering",
+            "studio-badge-status-failed",
+            "studio-badge-source-tiktok",
+            "studio-task-card",
+            "studio-project-meta-grid",
+            "studio-project-preview-empty",
+            "studio-project-log-dialog-marker",
+        ]
+        for class_name in expected_classes:
+            self.assertIn(class_name, theme_source)
 
 
 if __name__ == "__main__":
