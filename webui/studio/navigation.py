@@ -29,11 +29,11 @@ def render_studio_app() -> None:
     layout.render_top_bar()
 
     pages = [
-        st.Page(create.render_page, title="Create", icon="🎬", url_path="create"),
-        st.Page(projects.render_page, title="Projects", icon="🗂️", url_path="projects"),
-        st.Page(assets.render_page, title="Assets", icon="🎞️", url_path="assets"),
-        st.Page(brand.render_page, title="Brand", icon="🎨", url_path="brand"),
-        st.Page(settings.render_page, title="Settings", icon="⚙️", url_path="settings"),
+        st.Page(create.render_page, title="Create", url_path="create"),
+        st.Page(projects.render_page, title="Projects", url_path="projects"),
+        st.Page(assets.render_page, title="Assets", url_path="assets"),
+        st.Page(brand.render_page, title="Brand", url_path="brand"),
+        st.Page(settings.render_page, title="Settings", url_path="settings"),
     ]
     page = st.navigation(pages)
     page.run()

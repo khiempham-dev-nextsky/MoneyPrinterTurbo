@@ -100,7 +100,7 @@ def render_subtitle_advanced_settings(state: StudioCreateState) -> None:
 def _render_subtitle_preview(state: StudioCreateState) -> None:
     st.markdown(
         f"""
-        <div style="background:#111827;border-radius:8px;padding:24px;text-align:center;">
+        <div style="background:#111827;border-radius:8px;padding:24px;text-align:center;margin-bottom:16px;">
           <span style="
             color:{state.text_fore_color};
             font-size:{min(state.font_size, 72)}px;

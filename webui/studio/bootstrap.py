@@ -40,7 +40,7 @@ def init_page_config() -> None:
         page_title="MoneyPrinterTurbo Studio",
         page_icon="🎬",
         layout="wide",
-        initial_sidebar_state="expanded",
+        initial_sidebar_state="auto",
         menu_items={
             "Report a bug": "https://github.com/harry0703/MoneyPrinterTurbo/issues",
             "About": (
