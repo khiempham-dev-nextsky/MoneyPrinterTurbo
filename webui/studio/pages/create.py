@@ -150,17 +150,15 @@ def render_page() -> None:
 
     main_col, render_col = st.columns([7, 3], gap="large")
     with main_col:
-        with layout.section_card():
-            _render_brief_and_script_section(state)
-        with layout.section_card():
-            uploaded_files = _render_source_section(state)
-        with layout.section_card():
-            uploaded_audio_file = _render_audio_section(state)
-        with layout.section_card():
-            _render_subtitle_section(state)
+        _render_brief_and_script_section(state)
+        st.divider()
+        uploaded_files = _render_source_section(state)
+        st.divider()
+        uploaded_audio_file = _render_audio_section(state)
+        st.divider()
+        _render_subtitle_section(state)
 
     with render_col:
-        with layout.section_card():
-            _render_render_rail(state, uploaded_files, uploaded_audio_file)
+        _render_render_rail(state, uploaded_files, uploaded_audio_file)
 
     save_create_state(state)

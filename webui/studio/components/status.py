@@ -5,7 +5,6 @@ import streamlit as st
 
 from app.models import const
 from app.services import state as sm
-from webui.studio.components import layout
 from webui.studio.state import StudioRenderSnapshot
 
 
@@ -70,9 +69,8 @@ def render_video_outputs(videos: list[str]) -> None:
     cols = st.columns(min(len(videos), 3))
     for index, video_path in enumerate(videos):
         with cols[index % len(cols)]:
-            with st.container(border=True):
-                st.video(video_path)
-                layout.path_text(video_path, max_length=72)
+            st.video(video_path)
+            st.code(video_path)
 
 
 def _state_badge(snapshot: StudioRenderSnapshot) -> None:

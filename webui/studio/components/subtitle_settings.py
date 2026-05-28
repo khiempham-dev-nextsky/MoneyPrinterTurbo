@@ -100,11 +100,11 @@ def render_subtitle_advanced_settings(state: StudioCreateState) -> None:
 def _render_subtitle_preview(state: StudioCreateState) -> None:
     st.markdown(
         f"""
-        <div class="studio-subtitle-preview">
+        <div style="background:#111827;border-radius:8px;padding:24px;text-align:center;">
           <span style="
             color:{state.text_fore_color};
-            font-size:{min(state.font_size, 38)}px;
-            font-weight:600;
+            font-size:{min(state.font_size, 72)}px;
+            font-weight:700;
             text-shadow: 0 0 {max(state.stroke_width, 0.5) * 2}px {state.stroke_color};
           ">Subtitle Preview</span>
         </div>
