@@ -190,6 +190,41 @@ class TestLiteLLMProvider(unittest.TestCase):
         self.assertIn("Error:", result)
         self.assertIn("g4f package is not installed by default", result)
 
+    def test_translate_segments_returns_json_translations(self):
+        with patch.object(
+            llm,
+            "_generate_response",
+            return_value='["xin chào", "tạm biệt"]',
+        ) as generate_response:
+            result = llm.translate_segments(
+                ["hello", "goodbye"],
+                target_language="vi-VN",
+                source_language="en-US",
+            )
+
+        self.assertEqual(result, ["xin chào", "tạm biệt"])
+        prompt = generate_response.call_args.kwargs["prompt"]
+        self.assertIn("vi-VN", prompt)
+        self.assertIn("hello", prompt)
+        self.assertIn("goodbye", prompt)
+
+    def test_translate_segments_extracts_json_from_wrapped_response(self):
+        with patch.object(
+            llm,
+            "_generate_response",
+            return_value='Here is the JSON: ["ngủ ngon"]',
+        ):
+            result = llm.translate_segments(["sleep well"], target_language="vi-VN")
+
+        self.assertEqual(result, ["ngủ ngon"])
+
+    def test_translate_segments_rejects_count_mismatch(self):
+        with patch.object(llm, "_generate_response", return_value='["một"]'):
+            with self.assertRaises(ValueError) as cm:
+                llm.translate_segments(["one", "two"], target_language="vi-VN")
+
+        self.assertIn("same number", str(cm.exception))
+
 
 FOUNDRY_KEY = os.environ.get("ANTHROPIC_FOUNDRY_API_KEY", "")
 FOUNDRY_BASE = "https://amanrai-test-resource.services.ai.azure.com/anthropic"

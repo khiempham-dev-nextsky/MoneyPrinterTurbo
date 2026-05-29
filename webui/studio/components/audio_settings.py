@@ -89,7 +89,7 @@ def render_audio_settings(state: StudioCreateState):
     return None
 
 
-def render_audio_advanced_settings(state: StudioCreateState):
+def render_audio_advanced_settings(state: StudioCreateState, allow_custom_audio: bool = True):
     selected_server = config.ui.get("tts_server", "azure-tts-v1")
 
     if selected_server == "azure-tts-v2" or (
@@ -141,15 +141,17 @@ def render_audio_advanced_settings(state: StudioCreateState):
             else 2,
         )
 
-    uploaded_audio_file = st.file_uploader(
-        tr("Custom Audio File"),
-        type=["mp3", "wav", "m4a", "aac", "flac", "ogg", "MP3", "WAV", "M4A", "AAC", "FLAC", "OGG"],
-        accept_multiple_files=False,
-        key="studio_custom_audio",
-    )
-    if uploaded_audio_file:
-        st.audio(uploaded_audio_file, format="audio/mp3")
-        st.info(tr("Custom audio will be used directly. TTS synthesis will be skipped for this task."))
+    uploaded_audio_file = None
+    if allow_custom_audio:
+        uploaded_audio_file = st.file_uploader(
+            tr("Custom Audio File"),
+            type=["mp3", "wav", "m4a", "aac", "flac", "ogg", "MP3", "WAV", "M4A", "AAC", "FLAC", "OGG"],
+            accept_multiple_files=False,
+            key="studio_custom_audio",
+        )
+        if uploaded_audio_file:
+            st.audio(uploaded_audio_file, format="audio/mp3")
+            st.info(tr("Custom audio will be used directly. TTS synthesis will be skipped for this task."))
 
     bgm_options = [
         (tr("No Background Music"), ""),

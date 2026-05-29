@@ -60,6 +60,37 @@ class TestStudioProjects(unittest.TestCase):
         self.assertEqual(outputs[0]["log_path"], str(task_dir / "studio-render.log"))
         self.assertIn("Downloading materials", outputs[0]["log_excerpt"])
 
+    def test_list_task_outputs_includes_translate_task_log_and_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tasks_root = Path(tmp_dir)
+            task_dir = tasks_root / "translate-task"
+            task_dir.mkdir()
+            (task_dir / "studio-translate.log").write_text(
+                "Queued translate task\nStart translating video\n",
+                encoding="utf-8",
+            )
+            (task_dir / "script.json").write_text(
+                json.dumps(
+                    {
+                        "script": "Xin chào\nTạm biệt",
+                        "search_terms": [],
+                        "params": {
+                            "source_video_url": "https://www.tiktok.com/@demo/video/123",
+                        },
+                        "task_type": "translate",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            outputs = list_task_outputs(tasks_root)
+
+        self.assertEqual(len(outputs), 1)
+        self.assertEqual(outputs[0]["task_type"], "translate")
+        self.assertEqual(outputs[0]["source"], "translate")
+        self.assertEqual(outputs[0]["log_path"], str(task_dir / "studio-translate.log"))
+        self.assertIn("Start translating video", outputs[0]["log_excerpt"])
+
     def test_project_task_view_helpers_create_scan_friendly_metadata(self):
         item = {
             "task_id": "d3a67136-f7ad-4f77-97b4-7d0d733c2a8d",
@@ -76,6 +107,17 @@ class TestStudioProjects(unittest.TestCase):
         self.assertEqual(projects.task_status_key(item), "done")
         self.assertEqual(projects.task_status_label(item), "Done")
         self.assertEqual(projects.source_label(item), "TikTok")
+
+    def test_translate_task_uses_translate_title_and_source_label(self):
+        item = {
+            "task_id": "abc123",
+            "task_type": "translate",
+            "script": "Xin chào\nTạm biệt",
+            "params": {"source_video_url": "https://www.tiktok.com/@demo/video/123"},
+        }
+
+        self.assertEqual(projects.source_label(item), "Translate")
+        self.assertEqual(projects.task_title(item), "Dịch: Xin chào Tạm biệt")
 
     def test_project_filters_searches_and_sorts_tasks(self):
         tasks = [

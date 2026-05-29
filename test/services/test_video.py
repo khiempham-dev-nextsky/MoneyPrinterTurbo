@@ -19,7 +19,7 @@ from app.controllers.manager.base_manager import TaskQueueFullError
 from app.controllers.manager.memory_manager import InMemoryTaskManager
 from app.controllers.v1 import video as video_controller
 from app.models import const
-from app.models.schema import MaterialInfo, VideoConcatMode
+from app.models.schema import MaterialInfo, TranslateVideoParams, VideoConcatMode
 from app.services import state as sm
 from app.services import video as vd
 from app.utils import utils
@@ -285,6 +285,322 @@ class TestVideoService(unittest.TestCase):
 
         self.assertEqual(written_durations, [10])
         self.assertEqual(len(concat_inputs), 2)
+
+    def test_resolve_existing_video_canvas_size_uses_source_dimensions(self):
+        self.assertEqual(
+            vd._resolve_existing_video_canvas_size((720, 1280), "source"),
+            (720, 1280),
+        )
+        self.assertEqual(
+            vd._resolve_existing_video_canvas_size((720, 1280), "9:16"),
+            (1080, 1920),
+        )
+
+    def test_render_existing_video_preserves_source_canvas(self):
+        written = {}
+
+        class _FakeAudioReader:
+            def close(self):
+                pass
+
+        class _FakeSourceAudio:
+            duration = 2
+            fps = 44100
+
+            def with_effects(self, effects):
+                written["source_audio_effects"] = effects
+                return self
+
+        class _FakeAudioClip:
+            duration = 3
+            fps = 24000
+            reader = _FakeAudioReader()
+
+            def with_effects(self, effects):
+                return self
+
+            def subclipped(self, start, end):
+                written["audio_subclip"] = (start, end)
+                return self
+
+        class _FakeCompositeAudioClip:
+            duration = 2
+            fps = 24000
+
+            def __init__(self, clips):
+                written["mixed_audio_clips"] = clips
+
+        class _FakeVideoClip:
+            duration = 2
+            size = (720, 1280)
+            w = 720
+            h = 1280
+            audio = _FakeSourceAudio()
+            mask = None
+            clips = []
+            reader = _FakeAudioReader()
+
+            def with_audio(self, audio):
+                self.audio = audio
+                written["audio"] = audio
+                return self
+
+            def with_duration(self, duration):
+                written["video_duration"] = duration
+                self.duration = duration
+                return self
+
+            def write_videofile(self, output_file, **kwargs):
+                written["output_file"] = output_file
+                written["kwargs"] = kwargs
+                Path(output_file).write_bytes(b"video")
+
+        params = TranslateVideoParams(
+            source_video_path="/tmp/source.mp4",
+            voice_name="vi-VN-HoaiMyNeural-Female",
+            video_aspect="source",
+            bgm_type="",
+            subtitle_enabled=False,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            vd,
+            "_open_video_clip_quietly",
+            return_value=_FakeVideoClip(),
+        ), patch.object(vd, "AudioFileClip", return_value=_FakeAudioClip()), patch.object(
+            vd, "CompositeAudioClip", _FakeCompositeAudioClip
+        ):
+            output_file = os.path.join(temp_dir, "final.mp4")
+
+            vd.render_existing_video(
+                source_video_path="/tmp/source.mp4",
+                audio_path="/tmp/audio.mp3",
+                subtitle_path="",
+                output_file=output_file,
+                params=params,
+            )
+
+        self.assertEqual(written["output_file"], output_file)
+        self.assertEqual(written["kwargs"]["audio_fps"], 24000)
+        self.assertEqual(written["audio_subclip"], (0, 2))
+        self.assertIn("source_audio_effects", written)
+        self.assertEqual(len(written["mixed_audio_clips"]), 2)
+
+    def test_render_existing_video_opens_source_with_audio(self):
+        class _FakeReader:
+            def close(self):
+                pass
+
+        class _FakeSourceAudio:
+            duration = 2
+            fps = 44100
+
+            def with_effects(self, effects):
+                return self
+
+        class _FakeVideoClip:
+            duration = 2
+            size = (720, 1280)
+            w = 720
+            h = 1280
+            audio = _FakeSourceAudio()
+            mask = None
+            clips = []
+            reader = _FakeReader()
+
+            def with_audio(self, audio):
+                self.audio = audio
+                return self
+
+            def with_duration(self, duration):
+                return self
+
+            def write_videofile(self, output_file, **kwargs):
+                Path(output_file).write_bytes(b"video")
+
+        params = TranslateVideoParams(
+            source_video_path="/tmp/source.mp4",
+            voice_name="",
+            video_aspect="source",
+            bgm_type="",
+            subtitle_enabled=False,
+            voice_enabled=False,
+            source_audio_enabled=True,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            vd,
+            "_open_video_clip_quietly",
+            return_value=_FakeVideoClip(),
+        ) as open_video:
+            vd.render_existing_video(
+                source_video_path="/tmp/source.mp4",
+                audio_path="",
+                subtitle_path="",
+                output_file=os.path.join(temp_dir, "final.mp4"),
+                params=params,
+            )
+
+        open_video.assert_called_once_with("/tmp/source.mp4", audio=True)
+
+    def test_render_existing_video_can_disable_voice_and_keep_source_audio(self):
+        written = {}
+
+        class _FakeReader:
+            def close(self):
+                pass
+
+        class _FakeSourceAudio:
+            duration = 2
+            fps = 44100
+
+            def with_effects(self, effects):
+                written["source_audio_effects"] = effects
+                return self
+
+        class _FakeVideoClip:
+            duration = 2
+            size = (720, 1280)
+            w = 720
+            h = 1280
+            audio = _FakeSourceAudio()
+            mask = None
+            clips = []
+            reader = _FakeReader()
+
+            def with_audio(self, audio):
+                self.audio = audio
+                written["audio"] = audio
+                return self
+
+            def with_duration(self, duration):
+                return self
+
+            def write_videofile(self, output_file, **kwargs):
+                written["kwargs"] = kwargs
+                Path(output_file).write_bytes(b"video")
+
+        params = TranslateVideoParams(
+            source_video_path="/tmp/source.mp4",
+            voice_name="",
+            video_aspect="source",
+            bgm_type="",
+            subtitle_enabled=False,
+            voice_enabled=False,
+            source_audio_enabled=True,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            vd,
+            "_open_video_clip_quietly",
+            return_value=_FakeVideoClip(),
+        ), patch.object(vd, "AudioFileClip") as audio_file_clip:
+            vd.render_existing_video(
+                source_video_path="/tmp/source.mp4",
+                audio_path="",
+                subtitle_path="",
+                output_file=os.path.join(temp_dir, "final.mp4"),
+                params=params,
+            )
+
+        audio_file_clip.assert_not_called()
+        self.assertIn("source_audio_effects", written)
+        self.assertEqual(written["audio"], _FakeVideoClip.audio)
+        self.assertEqual(written["kwargs"]["audio_fps"], 44100)
+
+    def test_render_existing_video_preserves_source_duration_after_subtitles(self):
+        written = {}
+
+        class _FakeReader:
+            def close(self):
+                pass
+
+        class _FakeTextClip:
+            h = 24
+            reader = _FakeReader()
+            audio = None
+            mask = None
+            clips = []
+
+            def with_start(self, start):
+                return self
+
+            def with_end(self, end):
+                return self
+
+            def with_duration(self, duration):
+                return self
+
+            def with_position(self, position):
+                return self
+
+        class _FakeAudioClip:
+            duration = 5
+            fps = 24000
+            reader = _FakeReader()
+
+            def with_effects(self, effects):
+                return self
+
+            def subclipped(self, start, end):
+                written["audio_subclip"] = (start, end)
+                return self
+
+        class _FakeVideoClip:
+            duration = 2
+            size = (720, 1280)
+            w = 720
+            h = 1280
+            audio = None
+            mask = None
+            clips = []
+            reader = _FakeReader()
+
+            def with_audio(self, audio):
+                return self
+
+            def with_duration(self, duration):
+                written["video_duration"] = duration
+                self.duration = duration
+                return self
+
+            def write_videofile(self, output_file, **kwargs):
+                Path(output_file).write_bytes(b"video")
+
+        class _FakeCompositeClip(_FakeVideoClip):
+            duration = 4
+
+        class _FakeSubtitlesClip:
+            subtitles = [((0, 4), "subtitle kéo dài hơn video")]
+
+        params = TranslateVideoParams(
+            source_video_path="/tmp/source.mp4",
+            voice_name="vi-VN-HoaiMyNeural-Female",
+            video_aspect="source",
+            bgm_type="",
+            subtitle_enabled=True,
+            font_name="BeVietnamPro-Bold.ttf",
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.object(
+            vd,
+            "_open_video_clip_quietly",
+            return_value=_FakeVideoClip(),
+        ), patch.object(vd, "AudioFileClip", return_value=_FakeAudioClip()), patch.object(
+            vd, "SubtitlesClip", return_value=_FakeSubtitlesClip()
+        ), patch.object(vd, "TextClip", return_value=_FakeTextClip()), patch.object(
+            vd, "wrap_text", return_value=("subtitle", 20)
+        ), patch.object(vd, "CompositeVideoClip", return_value=_FakeCompositeClip()):
+            vd.render_existing_video(
+                source_video_path="/tmp/source.mp4",
+                audio_path="/tmp/audio.mp3",
+                subtitle_path="/tmp/subtitle.srt",
+                output_file=os.path.join(temp_dir, "final.mp4"),
+                params=params,
+            )
+
+        self.assertEqual(written["video_duration"], 2)
+        self.assertEqual(written["audio_subclip"], (0, 2))
     
     def test_wrap_text(self):
         """test text wrapping function"""

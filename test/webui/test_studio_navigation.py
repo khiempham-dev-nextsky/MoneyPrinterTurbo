@@ -15,6 +15,7 @@ class TestStudioNavigation(unittest.TestCase):
             [(item.key, item.label) for item in items],
             [
                 ("create", "Create"),
+                ("translate", "Translate"),
                 ("projects", "Projects"),
                 ("assets", "Assets"),
                 ("brand", "Brand"),

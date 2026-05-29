@@ -592,6 +592,72 @@ Please note that you must use English for generating video search terms; Chinese
     return search_terms
 
 
+def _extract_json_string_array(response: str) -> list[str]:
+    try:
+        parsed = json.loads(response)
+    except Exception:
+        match = re.search(r"\[.*\]", response or "", re.S)
+        if not match:
+            raise ValueError("LLM response does not contain a JSON array")
+        parsed = json.loads(match.group())
+
+    if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+        raise ValueError("LLM response must be a JSON array of strings")
+    return [item.strip() for item in parsed]
+
+
+def translate_segments(
+    segments: list[str],
+    target_language: str,
+    source_language: str = "",
+) -> list[str]:
+    cleaned_segments = [str(segment or "").strip() for segment in segments]
+    if not cleaned_segments:
+        return []
+
+    prompt = f"""
+# Role: Video Subtitle Translator
+
+## Goal
+Translate each subtitle segment into the target language while preserving the exact number and order of items.
+
+## Constraints
+1. Return only a JSON array of strings.
+2. The JSON array must contain exactly {len(cleaned_segments)} items.
+3. Do not add markdown, explanations, numbering, timestamps, or extra keys.
+4. Keep each translated item natural for text-to-speech dubbing.
+5. Keep each translated item concise enough to fit the original subtitle timing; prefer meaning over word-for-word length.
+
+## Input
+- source language: {source_language or "auto"}
+- target language: {target_language}
+- subtitle segments JSON:
+{json.dumps(cleaned_segments, ensure_ascii=False)}
+""".strip()
+
+    last_error = None
+    for i in range(_max_retries):
+        response = _generate_response(prompt=prompt)
+        if response.startswith("Error: "):
+            last_error = ValueError(response)
+        else:
+            try:
+                translated = _extract_json_string_array(response)
+                if len(translated) != len(cleaned_segments):
+                    raise ValueError(
+                        "LLM translation must return the same number of segments"
+                    )
+                return translated
+            except Exception as exc:
+                last_error = exc
+                logger.warning(f"failed to parse translated segments: {str(exc)}")
+
+        if i < _max_retries:
+            logger.warning(f"failed to translate segments, trying again... {i + 1}")
+
+    raise ValueError(str(last_error or "failed to translate segments"))
+
+
 if __name__ == "__main__":
     video_subject = "生命的意义是什么"
     script = generate_script(

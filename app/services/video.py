@@ -25,6 +25,7 @@ from PIL import Image, ImageFont
 from app.models import const
 from app.models.schema import (
     MaterialInfo,
+    TranslateVideoParams,
     VideoAspect,
     VideoConcatMode,
     VideoParams,
@@ -654,6 +655,202 @@ def generate_video(
     )
     video_clip.close()
     del video_clip
+
+
+def _resolve_existing_video_canvas_size(
+    source_size: tuple[int, int], video_aspect: str | None
+) -> tuple[int, int]:
+    if not video_aspect or video_aspect == "source":
+        return int(source_size[0]), int(source_size[1])
+    return VideoAspect(video_aspect).to_resolution()
+
+
+def _fit_existing_video_clip(video_clip, canvas_size: tuple[int, int], fit_mode: str = "contain"):
+    video_width, video_height = canvas_size
+    clip_w, clip_h = video_clip.size
+    if clip_w == video_width and clip_h == video_height:
+        return video_clip
+
+    clip_ratio = clip_w / clip_h
+    canvas_ratio = video_width / video_height
+    use_cover = str(fit_mode or "contain").lower() == "cover"
+    if use_cover:
+        scale_factor = video_width / clip_w if clip_ratio < canvas_ratio else video_height / clip_h
+        new_width = int(clip_w * scale_factor)
+        new_height = int(clip_h * scale_factor)
+        clip_resized = video_clip.resized(new_size=(new_width, new_height)).with_position("center")
+        return CompositeVideoClip([clip_resized], size=(video_width, video_height))
+
+    scale_factor = video_width / clip_w if clip_ratio > canvas_ratio else video_height / clip_h
+    new_width = int(clip_w * scale_factor)
+    new_height = int(clip_h * scale_factor)
+    background = ColorClip(size=(video_width, video_height), color=(0, 0, 0)).with_duration(
+        video_clip.duration
+    )
+    clip_resized = video_clip.resized(new_size=(new_width, new_height)).with_position("center")
+    return CompositeVideoClip([background, clip_resized], size=(video_width, video_height))
+
+
+def render_existing_video(
+    source_video_path: str,
+    audio_path: str,
+    subtitle_path: str,
+    output_file: str,
+    params: TranslateVideoParams,
+):
+    source_clip = _open_video_clip_quietly(source_video_path, audio=True)
+    source_duration = source_clip.duration
+    video_width, video_height = _resolve_existing_video_canvas_size(
+        source_clip.size, params.video_aspect
+    )
+    logger.info(f"rendering translated video: {video_width} x {video_height}")
+    logger.info(f"  ① source video: {source_video_path}")
+    logger.info(f"  ② dub audio: {audio_path}")
+    logger.info(f"  ③ subtitle: {subtitle_path}")
+    logger.info(f"  ④ output: {output_file}")
+
+    output_dir = os.path.dirname(output_file)
+    video_clip = _fit_existing_video_clip(
+        source_clip,
+        canvas_size=(video_width, video_height),
+        fit_mode=params.video_fit_mode,
+    )
+
+    font_path = ""
+    if params.subtitle_enabled:
+        if not params.font_name:
+            params.font_name = "STHeitiMedium.ttc"
+        font_path = os.path.join(utils.font_dir(), params.font_name)
+        if os.name == "nt":
+            font_path = font_path.replace("\\", "/")
+
+    def resolve_subtitle_background_color():
+        if isinstance(params.text_background_color, bool):
+            return "#000000" if params.text_background_color else None
+        return params.text_background_color
+
+    def create_text_clip(subtitle_item):
+        params.font_size = int(params.font_size)
+        params.stroke_width = int(params.stroke_width)
+        phrase = subtitle_item[1]
+        max_width = video_width * 0.9
+        wrapped_txt, txt_height = wrap_text(
+            phrase, max_width=max_width, font=font_path, fontsize=params.font_size
+        )
+        interline = int(params.font_size * 0.25)
+        line_count = wrapped_txt.count("\n") + 1
+        vertical_padding = int(params.font_size * 0.35)
+        text_clip = TextClip(
+            text=wrapped_txt,
+            font=font_path,
+            font_size=params.font_size,
+            color=params.text_fore_color,
+            bg_color=resolve_subtitle_background_color(),
+            stroke_color=params.stroke_color,
+            stroke_width=params.stroke_width,
+            interline=interline,
+            size=(
+                int(max_width),
+                int(txt_height + vertical_padding + (interline * line_count)),
+            ),
+            text_align="center",
+        )
+        duration = subtitle_item[0][1] - subtitle_item[0][0]
+        text_clip = text_clip.with_start(subtitle_item[0][0])
+        text_clip = text_clip.with_end(subtitle_item[0][1])
+        text_clip = text_clip.with_duration(duration)
+        if params.subtitle_position == "bottom":
+            text_clip = text_clip.with_position(("center", video_height * 0.95 - text_clip.h))
+        elif params.subtitle_position == "top":
+            text_clip = text_clip.with_position(("center", video_height * 0.05))
+        elif params.subtitle_position == "custom":
+            margin = 10
+            max_y = video_height - text_clip.h - margin
+            min_y = margin
+            custom_y = (video_height - text_clip.h) * (params.custom_position / 100)
+            text_clip = text_clip.with_position(("center", max(min_y, min(custom_y, max_y))))
+        else:
+            text_clip = text_clip.with_position(("center", "center"))
+        return text_clip
+
+    if params.subtitle_enabled and subtitle_path and os.path.exists(subtitle_path):
+        sub = SubtitlesClip(
+            subtitles=subtitle_path,
+            encoding="utf-8",
+            make_textclip=lambda text: TextClip(
+                text=text,
+                font=font_path,
+                font_size=params.font_size,
+            ),
+        )
+        text_clips = [create_text_clip(item) for item in sub.subtitles]
+        video_clip = CompositeVideoClip(
+            [video_clip, *text_clips], size=(video_width, video_height)
+        )
+
+    def resolve_volume(value, default: float = 1.0) -> float:
+        return default if value is None else float(value)
+
+    audio_clips = []
+    if params.source_audio_enabled and getattr(source_clip, "audio", None) is not None:
+        source_audio_clip = source_clip.audio.with_effects(
+            [afx.MultiplyVolume(resolve_volume(params.source_audio_volume))]
+        )
+        audio_clips.append(source_audio_clip)
+
+    if params.voice_enabled and audio_path:
+        voice_audio_clip = AudioFileClip(audio_path).with_effects(
+            [afx.MultiplyVolume(resolve_volume(params.voice_volume))]
+        )
+        if params.duration_mode == "preserve_video" and voice_audio_clip.duration > source_duration:
+            voice_audio_clip = voice_audio_clip.subclipped(0, source_duration)
+        audio_clips.append(voice_audio_clip)
+
+    audio_clip = None
+    if len(audio_clips) == 1:
+        audio_clip = audio_clips[0]
+    elif len(audio_clips) > 1:
+        audio_clip = CompositeAudioClip(audio_clips)
+
+    if params.duration_mode == "preserve_video":
+        video_clip = video_clip.with_duration(source_duration)
+        if audio_clip and audio_clip.duration > source_duration:
+            audio_clip = audio_clip.subclipped(0, source_duration)
+    elif (
+        audio_clip
+        and params.duration_mode != "preserve_video"
+        and video_clip.duration > audio_clip.duration
+    ):
+        video_clip = video_clip.subclipped(0, audio_clip.duration)
+
+    bgm_file = get_bgm_file(bgm_type=params.bgm_type, bgm_file=params.bgm_file)
+    if bgm_file:
+        try:
+            bgm_clip = AudioFileClip(bgm_file).with_effects(
+                [
+                    afx.MultiplyVolume(params.bgm_volume),
+                    afx.AudioFadeOut(3),
+                    afx.AudioLoop(duration=video_clip.duration),
+                ]
+            )
+            audio_clip = CompositeAudioClip([audio_clip, bgm_clip]) if audio_clip else bgm_clip
+        except Exception as e:
+            logger.error(f"failed to add bgm: {str(e)}")
+
+    if audio_clip:
+        video_clip = video_clip.with_audio(audio_clip)
+    output_audio_fps = int(getattr(audio_clip, "fps", 0) or 44100)
+    video_clip.write_videofile(
+        output_file,
+        audio_codec=audio_codec,
+        audio_fps=output_audio_fps,
+        audio_bitrate=audio_bitrate,
+        temp_audiofile_path=output_dir,
+        threads=params.n_threads or 2,
+        logger=None,
+        fps=fps,
+    )
+    close_clip(video_clip)
 
 
 def preprocess_video(materials: List[MaterialInfo], clip_duration=4):

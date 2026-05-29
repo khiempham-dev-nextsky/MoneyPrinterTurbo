@@ -6,6 +6,7 @@ import streamlit as st
 from app.config import config
 from app.models.schema import (
     MaterialInfo,
+    TranslateVideoParams,
     VideoAspect,
     VideoConcatMode,
     VideoParams,
@@ -51,6 +52,44 @@ class StudioCreateState:
 
 
 @dataclass
+class StudioTranslateState:
+    source_video_url: str = ""
+    source_video_path: str = ""
+    source_language: str = ""
+    target_language: str = "vi-VN"
+    translated_script: str = ""
+
+    video_subject: str = "Dịch video"
+    video_script: str = ""
+    video_language: str = "vi-VN"
+    video_aspect: str = "source"
+    video_fit_mode: str = "contain"
+    duration_mode: str = "preserve_video"
+    dubbing_mode: str = "natural"
+    n_threads: int = 2
+
+    voice_enabled: bool = True
+    voice_name: str = ""
+    voice_volume: float = 1.0
+    voice_rate: float = 1.0
+    source_audio_enabled: bool = True
+    source_audio_volume: float = 1.0
+    bgm_type: str = ""
+    bgm_file: str = ""
+    bgm_volume: float = 0.2
+
+    subtitle_enabled: bool = True
+    subtitle_position: str = "bottom"
+    custom_position: float = 70.0
+    font_name: str = "STHeitiMedium.ttc"
+    text_fore_color: str = "#FFFFFF"
+    text_background_color: bool | str = True
+    font_size: int = 60
+    stroke_color: str = "#000000"
+    stroke_width: float = 1.5
+
+
+@dataclass
 class StudioRenderSnapshot:
     task_id: str
     state: int | None = None
@@ -74,6 +113,18 @@ def deserialize_create_state(payload: dict[str, Any] | None) -> StudioCreateStat
     return StudioCreateState(**values)
 
 
+def serialize_translate_state(state: StudioTranslateState) -> dict[str, Any]:
+    return asdict(state)
+
+
+def deserialize_translate_state(payload: dict[str, Any] | None) -> StudioTranslateState:
+    if not isinstance(payload, dict):
+        return StudioTranslateState()
+    valid_names = {item.name for item in fields(StudioTranslateState)}
+    values = {key: value for key, value in payload.items() if key in valid_names}
+    return StudioTranslateState(**values)
+
+
 def material_records_to_infos(records: list[dict[str, Any]]) -> list[MaterialInfo]:
     materials = []
     for record in records:
@@ -86,6 +137,39 @@ def material_records_to_infos(records: list[dict[str, Any]]) -> list[MaterialInf
         material.duration = record.get("duration", 0)
         materials.append(material)
     return materials
+
+
+def build_translate_params(state: StudioTranslateState) -> TranslateVideoParams:
+    return TranslateVideoParams(
+        source_video_path=state.source_video_path.strip(),
+        source_video_url=state.source_video_url.strip(),
+        source_language=state.source_language,
+        target_language=state.target_language,
+        translated_script=state.translated_script,
+        video_aspect=state.video_aspect,
+        video_fit_mode=state.video_fit_mode,
+        duration_mode=state.duration_mode,
+        dubbing_mode=state.dubbing_mode,
+        voice_enabled=bool(state.voice_enabled),
+        voice_name=state.voice_name,
+        voice_volume=float(state.voice_volume),
+        voice_rate=float(state.voice_rate),
+        source_audio_enabled=bool(state.source_audio_enabled),
+        source_audio_volume=float(state.source_audio_volume),
+        bgm_type=state.bgm_type,
+        bgm_file=state.bgm_file,
+        bgm_volume=float(state.bgm_volume),
+        subtitle_enabled=bool(state.subtitle_enabled),
+        subtitle_position=state.subtitle_position,
+        custom_position=float(state.custom_position),
+        font_name=state.font_name,
+        text_fore_color=state.text_fore_color,
+        text_background_color=state.text_background_color,
+        font_size=int(state.font_size),
+        stroke_color=state.stroke_color,
+        stroke_width=float(state.stroke_width),
+        n_threads=int(state.n_threads),
+    )
 
 
 def build_video_params(state: StudioCreateState) -> VideoParams:
@@ -150,6 +234,36 @@ def load_create_state() -> StudioCreateState:
     return default_state
 
 
+def _default_translate_state() -> StudioTranslateState:
+    target_language = st.session_state.get(
+        "translate_target_language",
+        st.session_state.get("ui_language", config.ui.get("language", "vi-VN")),
+    )
+    return StudioTranslateState(
+        source_video_url=st.session_state.get("translate_source_video_url", ""),
+        source_video_path=st.session_state.get("translate_source_video_path", ""),
+        source_language=st.session_state.get("translate_source_language", ""),
+        target_language=target_language or "vi-VN",
+        video_language=target_language or "vi-VN",
+        subtitle_position=config.ui.get("subtitle_position", "bottom"),
+        custom_position=float(config.ui.get("custom_position", 70.0)),
+        font_name=config.ui.get("font_name", "STHeitiMedium.ttc"),
+        text_fore_color=config.ui.get("text_fore_color", "#FFFFFF"),
+        font_size=int(config.ui.get("font_size", 60)),
+        voice_name=config.ui.get("voice_name", ""),
+    )
+
+
+def load_translate_state() -> StudioTranslateState:
+    default_state = _default_translate_state()
+    saved_state = st.session_state.get("studio_translate_state")
+    if isinstance(saved_state, dict):
+        merged = serialize_translate_state(default_state)
+        merged.update(saved_state)
+        return deserialize_translate_state(merged)
+    return default_state
+
+
 def save_create_state(state: StudioCreateState) -> None:
     st.session_state["studio_create_state"] = serialize_create_state(state)
     st.session_state["video_subject"] = state.video_subject
@@ -157,3 +271,11 @@ def save_create_state(state: StudioCreateState) -> None:
     st.session_state["video_terms"] = state.video_terms
     st.session_state["video_language"] = state.video_language
     st.session_state["local_video_materials"] = state.local_video_materials
+
+
+def save_translate_state(state: StudioTranslateState) -> None:
+    st.session_state["studio_translate_state"] = serialize_translate_state(state)
+    st.session_state["translate_source_video_url"] = state.source_video_url
+    st.session_state["translate_source_video_path"] = state.source_video_path
+    st.session_state["translate_source_language"] = state.source_language
+    st.session_state["translate_target_language"] = state.target_language

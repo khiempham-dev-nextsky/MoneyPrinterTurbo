@@ -19,8 +19,12 @@ def read_task_script_data(task_dir: str | Path) -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
-def read_task_log_lines(task_dir: str | Path, limit: int = 80) -> list[str]:
-    log_file = Path(task_dir) / "studio-render.log"
+def read_task_log_lines(
+    task_dir: str | Path,
+    limit: int = 80,
+    log_name: str = "studio-render.log",
+) -> list[str]:
+    log_file = Path(task_dir) / log_name
     if not log_file.exists():
         return []
     try:
@@ -39,24 +43,39 @@ def list_task_outputs(tasks_root: str | Path, limit: int = 20) -> list[dict]:
     for task_dir in task_dirs[:limit]:
         videos = sorted(str(path) for path in task_dir.glob("final-*.mp4"))
         script_data = read_task_script_data(task_dir)
-        log_lines = read_task_log_lines(task_dir)
+        render_log_lines = read_task_log_lines(task_dir, log_name="studio-render.log")
+        translate_log_lines = read_task_log_lines(task_dir, log_name="studio-translate.log")
+        log_lines = render_log_lines or translate_log_lines
+        log_name = "studio-render.log" if render_log_lines else "studio-translate.log"
+        task_state = sm.state.get_task(task_dir.name) or {}
         params = script_data.get("params", {}) if isinstance(script_data, dict) else {}
+        if not params and isinstance(task_state.get("params"), dict):
+            params = task_state.get("params", {})
+        task_type = (
+            task_state.get("task_type")
+            or script_data.get("task_type", "")
+            or ("translate" if translate_log_lines else "")
+        )
+        script = script_data.get("script", "") or task_state.get("script", "")
+        search_terms = script_data.get("search_terms", []) or task_state.get("terms", [])
         task_state = sm.state.get_task(task_dir.name) or {}
         outputs.append(
             {
                 "task_id": task_dir.name,
                 "path": str(task_dir),
                 "videos": videos,
-                "log_path": str(task_dir / "studio-render.log") if log_lines else "",
+                "log_path": str(task_dir / log_name) if log_lines else "",
                 "log_excerpt": "\n".join(log_lines[-20:]),
-                "script": script_data.get("script", ""),
-                "search_terms": script_data.get("search_terms", []),
+                "script": script,
+                "search_terms": search_terms,
                 "subject": params.get("video_subject", ""),
-                "source": params.get("video_source", ""),
+                "source": params.get("video_source", "translate" if task_type == "translate" else ""),
                 "params": params,
+                "task_type": task_type,
                 "modified_time": task_dir.stat().st_mtime,
                 "state": task_state.get("state"),
                 "progress": task_state.get("progress", 0),
+                "error": task_state.get("error", ""),
             }
         )
     return outputs

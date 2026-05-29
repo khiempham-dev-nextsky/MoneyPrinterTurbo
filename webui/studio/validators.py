@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
-from app.models.schema import VideoParams
+from app.models.schema import TranslateVideoParams, VideoParams
 
 VALID_VIDEO_SOURCES = {"pexels", "pixabay", "local", "tiktok"}
+VALID_DUBBING_MODES = {"natural", "sync", "continuous"}
 
 
 @dataclass(frozen=True)
@@ -83,3 +85,54 @@ def validate_render_request(
 
     return issues
 
+
+def validate_translate_request(
+    params: TranslateVideoParams, app_config: dict[str, Any]
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+
+    source_path = str(params.source_video_path or "").strip()
+    source_url = str(params.source_video_url or "").strip()
+    if not source_path and not source_url:
+        issues.append(
+            ValidationIssue(
+                field="source_video",
+                message="Please Upload Source Video Or Enter A Video URL",
+            )
+        )
+
+    if source_url:
+        parsed = urlparse(source_url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            issues.append(
+                ValidationIssue(
+                    field="source_video_url",
+                    message="Please Enter A Valid HTTP Video URL",
+                )
+            )
+
+    if not str(params.target_language or "").strip():
+        issues.append(
+            ValidationIssue(
+                field="target_language",
+                message="Please Select Target Language",
+            )
+        )
+
+    if params.voice_enabled and not str(params.voice_name or "").strip():
+        issues.append(
+            ValidationIssue(
+                field="voice_name",
+                message="Please Select A Voice",
+            )
+        )
+
+    if str(params.dubbing_mode or "").strip() not in VALID_DUBBING_MODES:
+        issues.append(
+            ValidationIssue(
+                field="dubbing_mode",
+                message="Please Select A Valid Dubbing Mode",
+            )
+        )
+
+    return issues

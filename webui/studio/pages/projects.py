@@ -35,6 +35,14 @@ def _clean_text(value: str) -> str:
 
 
 def task_title(item: dict) -> str:
+    if item.get("task_type") == "translate":
+        script = _clean_text(item.get("script", ""))
+        if script:
+            return f"Dịch: {script[:100]}"
+        source = _clean_text(item.get("params", {}).get("source_video_url", ""))
+        if source:
+            return f"Dịch video: {truncate_middle(source, 96)}"
+
     subject = _clean_text(item.get("subject") or item.get("params", {}).get("video_subject", ""))
     if subject:
         return subject[:120]
@@ -46,12 +54,15 @@ def task_title(item: dict) -> str:
 
 
 def source_label(item: dict) -> str:
+    if item.get("task_type") == "translate":
+        return "Translate"
     source = _clean_text(item.get("source") or item.get("params", {}).get("video_source", ""))
     mapping = {
         "tiktok": "TikTok",
         "pexels": "Pexels",
         "pixabay": "Pixabay",
         "local": "Local",
+        "translate": "Translate",
     }
     return mapping.get(source.lower(), source.title() if source else "Unknown")
 

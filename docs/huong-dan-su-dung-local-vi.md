@@ -385,6 +385,54 @@ Luu y rieng voi TikTok:
 - Neu chon `serpapi` ma thieu `tiktok_search_api_key`, WebUI se bao loi truoc khi tao task.
 - Neu chon `openai_web_search` ma thieu `openai_api_key`, WebUI se bao loi truoc khi tao task.
 
+### 5.1. Dich video co san
+
+Page `Translate` dung de long tieng/dich video co san, tach rieng voi page `Create`.
+
+Pipeline:
+
+1. Upload video local hoac nhap URL video public/TikTok.
+2. App tai video ve `storage/tasks/<task_id>/` neu nhap URL.
+3. `ffmpeg` tach audio goc thanh WAV mono 16k.
+4. `faster-whisper` nghe audio va tao transcript/subtitle goc.
+5. LLM provider dang cau hinh trong `Cai Dat LLM` dich tung subtitle segment sang ngon ngu dich.
+6. TTS server dang chon tao audio long tieng moi.
+7. MoviePy/ffmpeg render audio dich va phu de dich len video goc.
+
+Cau hinh can co:
+
+- LLM hop le trong `Cai Dat LLM`, vi page Translate can LLM de dich transcript.
+- TTS server va voice hop le. `azure-tts-v1` qua `edge-tts` thuong khong can key rieng; `azure-tts-v2` can Azure Speech key; `siliconflow` can `siliconflow.api_key`; `gemini-tts` can `gemini_api_key`.
+- Whisper model co the tu tai theo `whisper.model_size`, hoac dat san trong `models/whisper-<model_size>`.
+- Neu URL la TikTok va bi chan, cau hinh `tiktok_cookie_file` tro toi file cookie da export tu trinh duyet.
+
+Cach dung nhanh:
+
+1. Mo `Translate` tren sidebar.
+2. Upload video hoac nhap URL TikTok/video public.
+3. Chon `Ngon ngu goc` la `Auto Detect` neu khong chac.
+4. Chon `Dich sang`, vi du `vi-VN`.
+5. Chon style phu de.
+6. Trong phan am thanh:
+   - `Giong doc dich`: bat/tat voice TTS cua ban dich. Neu tat, app khong yeu cau chon voice va khong tao file TTS.
+   - `Am thanh goc`: bat/tat tieng goc cua video. Mac dinh bat de video clone van giu tieng goc, ke ca khi co giong doc dich.
+   - `Am luong am thanh goc`: dieu chinh volume tieng goc khi mix voi giong doc dich.
+7. Neu bat `Giong doc dich`, chon voice TTS va `Che do long tieng`:
+   - `Tu nhien`: TTS toan bo ban dich mot lan nhu logic ban dau, nghe mem hon nhung de bi lech nhip/cham hon video. Day la mac dinh.
+   - `Lien mach`: TTS tung cau, nhung rut ngan khoang nghi dai giua cac subtitle segment xuong khoang rat ngan de giong doc lien tuc hon.
+   - `Khop nhip video`: TTS tung cau, tu speed-up neu cau dich dai hon slot goc, roi dat audio vao dung timestamp cua video goc. Nen dung cho video co nguoi noi nhanh.
+8. Bam `Dich video`.
+9. Co the chuyen sang `Projects` roi quay lai `Translate`; tien trinh van doc lai theo task dang chay.
+
+Ghi chu:
+
+- `Kich ban dich thu cong` la tuy chon nang cao. Neu nhap, moi dong nen tuong ung mot subtitle segment goc; neu khong khop so dong, app se bao loi de tranh lech timing.
+- Mac dinh `Ty le xuat = Giu ty le video goc`. Co the doi sang `9:16`, `16:9` hoac `1:1`.
+- `Contain` giu tron khung hinh va them nen den khi can; `Cover` lap day khung va co the crop mep video.
+- Khi `Giong doc dich` va `Am thanh goc` cung bat, output se mix voice TTS voi audio goc thay vi thay the audio goc.
+- Che do `Lien mach` uu tien trai nghiem nghe lien tuc, nen co the keo cau sau len som hon timestamp goc neu video goc co khoang lang dai. Phu de dich se dung timeline moi cua audio long tieng.
+- Che do `Khop nhip video` uu tien timing hon do tu nhien cua tung cau. Neu ban dich qua dai, app se tang toc rieng cau do bang `ffmpeg atempo`; nen prompt/dich ngan gon de giong doc khong bi qua nhanh.
+
 ## 6. Su dung API
 
 Base URL:

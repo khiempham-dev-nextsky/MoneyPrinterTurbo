@@ -108,6 +108,40 @@ class VideoParams(BaseModel):
     paragraph_number: Optional[int] = 1
 
 
+class TranslateVideoParams(BaseModel):
+    source_video_path: Optional[str] = None
+    source_video_url: Optional[str] = None
+    source_language: Optional[str] = ""
+    target_language: str = "vi-VN"
+    translated_script: Optional[str] = ""
+
+    video_aspect: Optional[str] = "source"
+    video_fit_mode: Optional[str] = "contain"
+    duration_mode: Optional[str] = "preserve_video"
+    dubbing_mode: Optional[str] = "natural"
+
+    voice_enabled: Optional[bool] = True
+    voice_name: Optional[str] = ""
+    voice_volume: Optional[float] = 1.0
+    voice_rate: Optional[float] = 1.0
+    source_audio_enabled: Optional[bool] = True
+    source_audio_volume: Optional[float] = 1.0
+    bgm_type: Optional[str] = ""
+    bgm_file: Optional[str] = ""
+    bgm_volume: Optional[float] = 0.2
+
+    subtitle_enabled: Optional[bool] = True
+    subtitle_position: Optional[str] = config.ui.get("subtitle_position", "bottom")
+    custom_position: float = config.ui.get("custom_position", 70.0)
+    font_name: Optional[str] = "STHeitiMedium.ttc"
+    text_fore_color: Optional[str] = "#FFFFFF"
+    text_background_color: Union[bool, str] = True
+    font_size: int = 60
+    stroke_color: Optional[str] = "#000000"
+    stroke_width: float = 1.5
+    n_threads: Optional[int] = 2
+
+
 class SubtitleRequest(BaseModel):
     video_script: str
     video_language: Optional[str] = ""
