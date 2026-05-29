@@ -111,7 +111,10 @@ class TestVideoService(unittest.TestCase):
 
             # moviepy get video info
             clip = VideoFileClip(materials[0].url)
-            print(clip)
+            try:
+                print(clip)
+            finally:
+                clip.close()
 
             # clean generated test video file
             if os.path.exists(materials[0].url):
@@ -601,6 +604,34 @@ class TestVideoService(unittest.TestCase):
 
         self.assertEqual(written["video_duration"], 2)
         self.assertEqual(written["audio_subclip"], (0, 2))
+
+    def test_combine_videos_handles_none_transition_mode(self):
+        """
+        Ensure `combine_videos` safely handles
+        `video_transition_mode=None`.
+        """
+        class _FakeAudioClip:
+            @property
+            def duration(self):
+                return 10.0
+
+            def close(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            combined_video_path = os.path.join(temp_dir, "combined.mp4")
+            audio_file = os.path.join(temp_dir, "audio.mp3")
+
+            with patch.object(vd, "AudioFileClip", return_value=_FakeAudioClip()):
+                # Use empty video_paths to avoid heavy video processing while
+                # still exercising transition mode normalization logic.
+                result = vd.combine_videos(
+                    combined_video_path=combined_video_path,
+                    video_paths=[],
+                    audio_file=audio_file,
+                    video_transition_mode=None,
+                )
+                self.assertEqual(result, combined_video_path)
     
     def test_wrap_text(self):
         """test text wrapping function"""
